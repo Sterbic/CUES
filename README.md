@@ -37,7 +37,8 @@ The second parameter is the vertex ID of the start of the epidemics (patient zer
 4) Acknowledgments
 ---------------------
 
-The BFS paralellization used in CUES is mainly based on [Scalable GPU Graph Traversal][1] by Merrill et al.
+The BFS parallelization used in CUES is largely based on paper by Duane Merrill, Michael Garland and Andrew Grimshaw,
+ [Scalable GPU Graph Traversal][1]
 
 
 [1]: https://research.nvidia.com/publication/scalable-gpu-graph-traversal "Scalable GPU Graph Traversal"
