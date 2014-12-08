@@ -23,7 +23,7 @@ The warp size for the Kepler architecture is of 32 threads and the maximum numbe
 2) Installation
 ---------------------
 
-To instal CUES run make in it's root folder. This will build an executable named `cues`.
+To install CUES run make in it's root folder. This will build an executable named `cues`.
 
 
 3) Usage
@@ -32,12 +32,12 @@ To instal CUES run make in it's root folder. This will build an executable named
 `./cues <graph_path> <source_node> <p> <q> <simulations>`
 
 CUES expects 5 command line arguments: 
-- **graph_path:**      the path to the graph in edge list format of the network that will be used
+- **graph_path:** the path to the graph in edge list format of the network that will be used
 in the simulation 
-- **source_node:**      the node ID of the start of the epidemics, patient zero 
-- **p:**      the probability that a node will infect its neighbors 
-- **q:**      the probability that a node will recover and become immune 
-- **simulations:**      the number of simulations to run
+- **source_node:** the node ID of the start of the epidemics, patient zero 
+- **p:** the probability that a node will infect its neighbors 
+- **q:** the probability that a node will recover and become immune 
+- **simulations:** the number of simulations to run
 
 
 4) Documentation

@@ -42,4 +42,38 @@ void printUsage() {
 	printf("See README.md for details.\n");
 }
 
-#endif /* UTILS_CUH_ */
+/**
+ * Allocate device memoery and set it to the given value.
+ * devicePointer: pointer to a device pointer
+ * size: the size of the memory to allocate in bytes
+ * setTo: the value used to set the allocated memory
+ * returns: the CUDA error state after the performed operations
+ */
+cudaError_t cudaGetSpaceAndSet(void **devicePointer, size_t size, int setTo) {
+	cudaError_t status = cudaMalloc(devicePointer, size);
+
+	if(status != cudaSuccess) {
+		return status;
+	}
+
+	return cudaMemset(*devicePointer, setTo, size);
+}
+
+/**
+ * Creates a device copy of the given array.
+ * src: the source array in host memory
+ * dst: pointer to a device pointer where the copy will be placed
+ * size: the size of the source array in bytes
+ * returns: the CUDA error state after the performed operations
+ */
+cudaError_t cudaGetDeviceCopy(void *src, void** dst, size_t size) {
+	cudaError_t status = cudaMalloc(dst, size);
+
+	if(status != cudaSuccess) {
+		return status;
+	}
+
+    return cudaMemcpy(*dst, src, size, cudaMemcpyHostToDevice);
+}
+
+#endif

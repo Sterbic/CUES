@@ -12,6 +12,7 @@
 
 #include "utils.cuh"
 #include "graph.cuh"
+#include "simulation.cuh"
 
 __device__ unsigned int bitreverse(unsigned int number) {
 	number = ((0xf0f0f0f0 & number) >> 4) | ((0x0f0f0f0f & number) << 4);
@@ -58,23 +59,45 @@ __global__ void bitreverse(void *data) {
 	return 0;
 }*/
 
-
-
 int main(int argc, char **argv) {
 	if(argc != 6) {
 		printUsage();
 		exit(1);
 	}
 
-	printf("Loading graph... ");
-	Graph *graph = loadGraph(argv[1]);
+	char *graphPath = argv[1];
+	int patientZero = atoi(argv[2]);
+	double p = atof(argv[3]);
+	double q = atof(argv[4]);
+	int simulations = atoi(argv[5]);
+
+	exitIf(p < 0.0 || p > 1.0,
+			"The p parameter should be from the interval [0-1].");
+	exitIf(q < 0.0 || q > 1.0,
+			"The q parameter should be from the interval [0-1].");
+	exitIf(simulations < 1, "The number of simulations should be at least 1.");
+
+	printf("Input parameters:\n");
+	printf("\t%-15s %15s\n", "Graph path:", graphPath);
+	printf("\t%-15s %15d\n", "Source node:", patientZero);
+	printf("\t%-15s %15.2f\n", "Q:", q);
+	printf("\t%-15s %15.2f\n", "P:", p);
+	printf("\t%-15s %15d\n", "Simulations:", simulations);
+
+	printf("\nLoading graph... ");
+	Graph *graph = loadGraph(graphPath);
 	printf("DONE\n");
 
-	printf("\tFile: %s\n", argv[1]);
-	printf("\tNodes: %u\n", graph->N);
-	printf("\tEdges: %u\n", graph->M);
+	exitIf(patientZero < 0 || patientZero > graph->N - 1,
+			"Source node is not present in the input graph.");
 
-	printGraph(graph);
+	printf("\t%-15s %15u\n", "Nodes:", graph->N);
+	printf("\t%-15s %15u\n\n", "Edges:", graph->M);
+
+	printf("Creating simulation context... ");
+	SimulationContext *context = createSimulationContext(graph);
+	printf("DONE\n");
+
+	freeSimulationContext(context);
 	freeGraph(graph);
 }
-

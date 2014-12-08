@@ -30,6 +30,7 @@ typedef struct {
 /**
  * Load the a graph stored in edge list format.
  * path: the path to the input file
+ * returns: a pointer to the created graph
  */
 Graph *loadGraph(const char *path) {
 	FILE *file = fopen(path, "r");
@@ -127,4 +128,4 @@ void printGraph(Graph *graph) {
 	}
 }
 
-#endif /* GRAPH_CUH_ */
+#endif
