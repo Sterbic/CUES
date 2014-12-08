@@ -29,16 +29,28 @@ To instal CUES run make in it's root folder. This will build an executable named
 3) Usage
 ---------------------
 
-`./cues <path_to_graph> <source_vertex> <simulations>`
+`./cues <graph_path> <source_node> <p> <q> <simulations>`
+CUES expects 5 command line arguments: 
+- **graph_path:**      the path to the graph in edge list format of the network that will be used
+in the simulation 
+- **source_node:**      the node ID of the start of the epidemics, patient zero 
+- **p:**      the probability that a node will infect its neighbors 
+- **q:**      the probability that a node will recover and become immune 
+- **simulations:**      the number of simulations to run
 
-CUES expects 3 command line arguments. The first one is the path to the graph of the network that will be used in the simulation.
-The second parameter is the vertex ID of the start of the epidemics (patient zero), while the third parameter controls the number of simulations to perform.
 
-4) Acknowledgments
+4) Documentation
+---------------------
+
+A more detailed explanation of the usage and implmented algorithm may be viewed [here][2].
+
+
+5) Acknowledgments
 ---------------------
 
 The BFS parallelization used in CUES is largely based on paper by Duane Merrill, Michael Garland and Andrew Grimshaw,
- [Scalable GPU Graph Traversal][1]
+ [Scalable GPU Graph Traversal][1].
 
 
 [1]: https://research.nvidia.com/publication/scalable-gpu-graph-traversal "Scalable GPU Graph Traversal"
+[2]: https://docs.google.com/document/d/1m2SnumwScQOHD21op-_IcjQMCoVw34bIVtU_sIQ1VcE/edit?usp=sharing "CUES Documentation"

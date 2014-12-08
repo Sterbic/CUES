@@ -10,19 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static const int WORK_SIZE = 256;
-
-/**
- * This macro checks return value of the CUDA runtime call and exits
- * the application if the call failed.
- */
-#define CUDA_CHECK_RETURN(value) {											\
-	cudaError_t _m_cudaStat = value;										\
-	if (_m_cudaStat != cudaSuccess) {										\
-		fprintf(stderr, "Error %s at line %d in file %s\n",					\
-				cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);		\
-		exit(1);															\
-	} }
+#include "utils.cuh"
+#include "graph.cuh"
 
 __device__ unsigned int bitreverse(unsigned int number) {
 	number = ((0xf0f0f0f0 & number) >> 4) | ((0x0f0f0f0f & number) << 4);
@@ -42,7 +31,7 @@ __global__ void bitreverse(void *data) {
 /**
  * Host function that prepares data array and passes it to the CUDA kernel.
  */
-int main(void) {
+/*int main(void) {
 	void *d = NULL;
 	int i;
 	unsigned int idata[WORK_SIZE], odata[WORK_SIZE];
@@ -67,4 +56,25 @@ int main(void) {
 	CUDA_CHECK_RETURN(cudaDeviceReset());
 
 	return 0;
+}*/
+
+
+
+int main(int argc, char **argv) {
+	if(argc != 6) {
+		printUsage();
+		exit(1);
+	}
+
+	printf("Loading graph... ");
+	Graph *graph = loadGraph(argv[1]);
+	printf("DONE\n");
+
+	printf("\tFile: %s\n", argv[1]);
+	printf("\tNodes: %u\n", graph->N);
+	printf("\tEdges: %u\n", graph->M);
+
+	printGraph(graph);
+	freeGraph(graph);
 }
+
