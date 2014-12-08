@@ -30,6 +30,7 @@ To instal CUES run make in it's root folder. This will build an executable named
 ---------------------
 
 `./cues <graph_path> <source_node> <p> <q> <simulations>`
+
 CUES expects 5 command line arguments: 
 - **graph_path:**      the path to the graph in edge list format of the network that will be used
 in the simulation 
@@ -42,7 +43,7 @@ in the simulation
 4) Documentation
 ---------------------
 
-A more detailed explanation of the usage and implmented algorithm may be viewed [here][2].
+A more detailed explanation of the usage and implemented algorithm may be viewed [here][2].
 
 
 5) Acknowledgments
