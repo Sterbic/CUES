@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <cuda_runtime.h>
+#include <curand.h>
 
 /**
  * Standard CUDA error check macro. Will exit the program on detected error.
@@ -19,6 +20,17 @@
 	if (_m_cudaStat != cudaSuccess) {										\
 		fprintf(stderr, "Error %s at line %d in file %s\n",					\
 				cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);		\
+		exit(1);															\
+	}}
+
+/**
+ * Macro for safe curand calls. Will exit the program on detected error.
+ */
+#define CURAND_CHECK_RETURN(value) {										\
+	curandStatus_t curandResult = value;											\
+	if (curandResult != CURAND_STATUS_SUCCESS) {							\
+		fprintf(stderr, "Error %d in curand call at line %d in file %s\n",	\
+				curandResult, __LINE__, __FILE__);							\
 		exit(1);															\
 	}}
 
@@ -180,7 +192,7 @@ int cudaGetMaxGflopsDeviceID() {
 }
 
 /**
- * Creates a device copy of the given array.
+ * Creates a device copy of the given host array.
  * src: the source array in host memory
  * dst: pointer to a device pointer where the copy will be placed
  * size: the size of the source array in bytes
@@ -194,6 +206,42 @@ cudaError_t cudaGetDeviceCopy(void *src, void** dst, size_t size) {
 	}
 
     return cudaMemcpy(*dst, src, size, cudaMemcpyHostToDevice);
+}
+
+/**
+ * Creates a host copy of the given device array.
+ * src: the source array in device memory
+ * dst: pointer to a host pointer where the copy will be placed
+ * size: the size of the source array in bytes
+ * returns: the CUDA error state after the performed operations
+ */
+cudaError_t cudaGetHostCopy(void *src, void** dst, size_t size) {
+	*dst = malloc(size);
+	exitIf(*dst == NULL, "Error allocating host copy array.");
+	return cudaMemcpy(*dst, src, size, cudaMemcpyDeviceToHost);
+}
+
+/**
+ * Prints the given float array to stdout.
+ * array: the source array
+ * size: the size of the array
+ * onHost: true if the array is in host memory, false if it's on the device
+ */
+void printFloatArray(float *array, int size, bool onHost) {
+	float *printArray = array;
+
+	if(!onHost) {
+		CUDA_CHECK_RETURN(cudaGetHostCopy(
+				(void *) array,
+				(void **) &printArray,
+				size * sizeof(float)
+				));
+	}
+
+	for(int i = 0; i < size; i++) {
+		printf("%.5f", printArray[i]);
+		printf(i == size - 1 ? "\n" : ", ");
+	}
 }
 
 #endif

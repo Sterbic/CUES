@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <curand.h>
 
 #include "utils.cuh"
 #include "graph.cuh"
@@ -80,28 +81,33 @@ int main(int argc, char **argv) {
 
 	printf("Input parameters:\n");
 
-	printf("\t%-20s %s\n", "Graph file:", graphPath);
-	printf("\t%-20s %d\n", "Source node:", patientZero);
-	printf("\t%-20s %.2f\n", "Q:", q);
-	printf("\t%-20s %.2f\n", "P:", p);
-	printf("\t%-20s %d\n", "Simulations:", simulations);
+	printf("\t%-25s %s\n", "Graph file:", graphPath);
+	printf("\t%-25s %d\n", "Source node:", patientZero);
+	printf("\t%-25s %.2f\n", "Q:", q);
+	printf("\t%-25s %.2f\n", "P:", p);
+	printf("\t%-25s %d\n", "Simulations:", simulations);
 
 	printf("\nSearching for best device... ");
 
 	int devideID = cudaGetMaxGflopsDeviceID();
+	CUDA_CHECK_RETURN(cudaSetDevice(devideID));
+
 	cudaDeviceProp deviceProperties;
 	CUDA_CHECK_RETURN(cudaGetDeviceProperties(&deviceProperties, devideID));
 
 	int deviceMajor = deviceProperties.major;
 	int deviceMinor = deviceProperties.minor;
 	int deviceMPs = deviceProperties.multiProcessorCount;
+	int residentThreadsPerMP = deviceProperties.maxThreadsPerMultiProcessor;
+	int totalResidentThreads = deviceMPs * residentThreadsPerMP;
 
 	printf("DONE\n");
-	printf("\t%-20s %s\n", "Device:", deviceProperties.name);
-	printf("\t%-20s %d.%d\n", "Capability", deviceMajor, deviceMinor);
-	printf("\t%-20s %d\n", "Multiprocessors", deviceMPs);
-	printf("\t%-20s %d\n", "Total CUDA cores", deviceMPs
+	printf("\t%-25s %s\n", "Device:", deviceProperties.name);
+	printf("\t%-25s %d.%d\n", "Capability", deviceMajor, deviceMinor);
+	printf("\t%-25s %d\n", "Multiprocessors", deviceMPs);
+	printf("\t%-25s %d\n", "Total CUDA cores", deviceMPs
 			* convertSMVersion2Cores(deviceMajor, deviceMinor));
+	printf("\t%-25s %d\n", "Total resident threads:", totalResidentThreads);
 
 	printf("\nLoading graph... ");
 	Graph *graph = loadGraph(graphPath);
@@ -110,12 +116,14 @@ int main(int argc, char **argv) {
 	exitIf(patientZero < 0 || patientZero > graph->N - 1,
 			"Source node is not present in the input graph.");
 
-	printf("\t%-20s %u\n", "Nodes:", graph->N);
-	printf("\t%-20s %u\n", "Edges:", graph->M);
+	printf("\t%-25s %u\n", "Nodes:", graph->N);
+	printf("\t%-25s %u\n", "Edges:", graph->M);
 
 	printf("\nCreating simulation context... ");
 	SimulationContext *context = createSimulationContext(graph);
 	printf("DONE\n");
+
+	generatePQRandoms(context);
 
 	freeSimulationContext(context);
 	freeGraph(graph);
