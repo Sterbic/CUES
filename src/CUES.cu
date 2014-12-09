@@ -7,6 +7,7 @@
  * this software and related documentation outside the terms of the EULA
  * is strictly prohibited.
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -78,11 +79,29 @@ int main(int argc, char **argv) {
 	exitIf(simulations < 1, "The number of simulations should be at least 1.");
 
 	printf("Input parameters:\n");
-	printf("\t%-15s %15s\n", "Graph path:", graphPath);
-	printf("\t%-15s %15d\n", "Source node:", patientZero);
-	printf("\t%-15s %15.2f\n", "Q:", q);
-	printf("\t%-15s %15.2f\n", "P:", p);
-	printf("\t%-15s %15d\n", "Simulations:", simulations);
+
+	printf("\t%-20s %s\n", "Graph file:", graphPath);
+	printf("\t%-20s %d\n", "Source node:", patientZero);
+	printf("\t%-20s %.2f\n", "Q:", q);
+	printf("\t%-20s %.2f\n", "P:", p);
+	printf("\t%-20s %d\n", "Simulations:", simulations);
+
+	printf("\nSearching for best device... ");
+
+	int devideID = cudaGetMaxGflopsDeviceID();
+	cudaDeviceProp deviceProperties;
+	CUDA_CHECK_RETURN(cudaGetDeviceProperties(&deviceProperties, devideID));
+
+	int deviceMajor = deviceProperties.major;
+	int deviceMinor = deviceProperties.minor;
+	int deviceMPs = deviceProperties.multiProcessorCount;
+
+	printf("DONE\n");
+	printf("\t%-20s %s\n", "Device:", deviceProperties.name);
+	printf("\t%-20s %d.%d\n", "Capability", deviceMajor, deviceMinor);
+	printf("\t%-20s %d\n", "Multiprocessors", deviceMPs);
+	printf("\t%-20s %d\n", "Total CUDA cores", deviceMPs
+			* convertSMVersion2Cores(deviceMajor, deviceMinor));
 
 	printf("\nLoading graph... ");
 	Graph *graph = loadGraph(graphPath);
@@ -91,10 +110,10 @@ int main(int argc, char **argv) {
 	exitIf(patientZero < 0 || patientZero > graph->N - 1,
 			"Source node is not present in the input graph.");
 
-	printf("\t%-15s %15u\n", "Nodes:", graph->N);
-	printf("\t%-15s %15u\n\n", "Edges:", graph->M);
+	printf("\t%-20s %u\n", "Nodes:", graph->N);
+	printf("\t%-20s %u\n", "Edges:", graph->M);
 
-	printf("Creating simulation context... ");
+	printf("\nCreating simulation context... ");
 	SimulationContext *context = createSimulationContext(graph);
 	printf("DONE\n");
 
