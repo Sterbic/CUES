@@ -15,6 +15,7 @@ To properly run CUES the following software is needed:
 3. make
     
 A CUDA capable GPU with computing capability 3.0 (Kepler architecture) or greater is also needed.
+The program will automatically choose the best compatible device in terms of GFLOPS.
 
 This software was developed and tested on a GeForce GT 650M with 2 multiprocessors and 192 cores per MP.
 The warp size for the Kepler architecture is of 32 threads and the maximum number of threads per MP is 2048.
@@ -23,7 +24,7 @@ The warp size for the Kepler architecture is of 32 threads and the maximum numbe
 2) Installation
 ---------------------
 
-To install CUES run make in it's root folder. This will build an executable named `cues`.
+To install CUES run make in its root folder. This will build an executable named `cues`.
 
 
 3) Usage
@@ -49,8 +50,7 @@ A more detailed explanation of the usage and implemented algorithm may be viewed
 5) Acknowledgments
 ---------------------
 
-The BFS parallelization used in CUES is largely based on paper by Duane Merrill, Michael Garland and Andrew Grimshaw,
- [Scalable GPU Graph Traversal][1].
+The BFS parallelization used in CUES is largely based on paper by Duane Merrill, Michael Garland and Andrew Grimshaw, [Scalable GPU Graph Traversal][1].
 
 
 [1]: https://research.nvidia.com/publication/scalable-gpu-graph-traversal "Scalable GPU Graph Traversal"

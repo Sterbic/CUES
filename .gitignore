@@ -7,6 +7,9 @@ Debug/
 # OSX files
 .DS_Store
 
+# PyCharm files
+scripts/.idea/
+
 # Object files
 *.o
 *.ko

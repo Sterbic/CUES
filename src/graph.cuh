@@ -1,9 +1,12 @@
+/**
+ * Graph structure and functions for the CUES project.
+ */
+
 #ifndef GRAPH_CUH_
 #define GRAPH_CUH_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 #include <algorithm>
 

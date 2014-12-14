@@ -18,7 +18,9 @@
  * R[N+1]: contains the indices in C for the start of the adjacency lists
  * C[CSize]: concatenated adjacency lists
  * levels[N]: the iteration at which each node was discovered
+ * inFrontierSize: the current size of the input frontier
  * inputFrontier[CSize]: the input edge frontier
+ * outFrontierSize: the current size of the output frontier
  * outputFrontier[CSize]: the output edge frontier
  * prng: the random generator used in the simulations
  * pRand[N]: probabilities to be avaluated agains p (infect neighbors)
@@ -30,7 +32,9 @@ typedef struct {
 	unsigned int *R;
 	unsigned int *C;
 	int *levels;
+	unsigned int *inFrontierSize;
 	unsigned int *inputFrontier;
+	unsigned int *outFrontierSize;
 	unsigned int *outputFrontier;
 	curandGenerator_t prng;
 	float *pRand;
@@ -54,40 +58,49 @@ SimulationContext *createSimulationContext(Graph *graph) {
 			(void *) graph->R,
 			(void **) &context->R,
 			(graph->N + 1) * sizeof(unsigned int)
-			));
+	));
 
 	CUDA_CHECK_RETURN(cudaGetDeviceCopy(
 			(void *) graph->C,
 			(void **) &context->C,
 			(graph->CSize) * sizeof(unsigned int)
-			));
+	));
 
-	CUDA_CHECK_RETURN(cudaGetSpaceAndSet(
-			(void **) &context->levels,
-			context->nodes,
-			-1));
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->levels, context->nodes * sizeof(int)
+	));
 
-	CUDA_CHECK_RETURN(cudaGetSpaceAndSet(
-			(void **) &context->inputFrontier,
-			context->CSize,
-			-1
-			));
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->inFrontierSize, sizeof(unsigned int)
+	));
 
-	CUDA_CHECK_RETURN(cudaGetSpaceAndSet(
-			(void **) &context->outputFrontier,
-			context->CSize,
-			-1
-			));
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->inputFrontier, context->CSize * sizeof(unsigned int)
+	));
+
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->outFrontierSize, sizeof(unsigned int)
+	));
+
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->outputFrontier, context->CSize * sizeof(unsigned int)
+	));
 
     CURAND_CHECK_RETURN(curandCreateGenerator(
-    		&context->prng, CURAND_RNG_PSEUDO_DEFAULT));
+    		&context->prng, CURAND_RNG_PSEUDO_DEFAULT
+	));
+
     CURAND_CHECK_RETURN(curandSetPseudoRandomGeneratorSeed(
-    		context->prng, SEED));
+    		context->prng, SEED
+	));
 
     CUDA_CHECK_RETURN(cudaMalloc(
-    		&context->pRand, context->nodes * sizeof(float)));
+    		&context->pRand, context->nodes * sizeof(float)
+	));
+
     CUDA_CHECK_RETURN(cudaMalloc(
-    		&context->qRand, context->nodes * sizeof(float)));
+    		&context->qRand, context->nodes * sizeof(float)
+	));
 
 	return context;
 }
@@ -99,9 +112,43 @@ SimulationContext *createSimulationContext(Graph *graph) {
  */
 void generatePQRandoms(SimulationContext *context) {
     CURAND_CHECK_RETURN(curandGenerateUniform(
-    		context->prng, context->pRand, context->nodes));
+    		context->prng, context->pRand, context->nodes
+	));
+
     CURAND_CHECK_RETURN(curandGenerateUniform(
-    		context->prng, context->qRand, context->nodes));
+    		context->prng, context->qRand, context->nodes
+	));
+}
+
+/**
+ * Sets the initial values of the context before each simulation.
+ * context: the context pointer returned by createSimulationContext
+ * src: the source node for the current simulation
+ */
+void prepareSimulationContext(SimulationContext *context, unsigned int src) {
+	static unsigned int one = 1;
+
+	CUDA_CHECK_RETURN(cudaMemset(
+			context->levels, -1, context->nodes * sizeof(int)
+	));
+
+	CUDA_CHECK_RETURN(cudaMemcpy(
+			context->inFrontierSize,
+			&one,
+			sizeof(unsigned int),
+			cudaMemcpyHostToDevice
+	));
+
+	CUDA_CHECK_RETURN(cudaMemcpy(
+			context->inputFrontier,
+			&src,
+			sizeof(unsigned int),
+			cudaMemcpyHostToDevice
+	));
+
+	CUDA_CHECK_RETURN(cudaMemset(
+			context->outFrontierSize, 0, sizeof(unsigned int)
+	));
 }
 
 /**
@@ -113,7 +160,9 @@ void freeSimulationContext(SimulationContext *context) {
 		CUDA_CHECK_RETURN(cudaFree(context->R));
 		CUDA_CHECK_RETURN(cudaFree(context->C));
 		CUDA_CHECK_RETURN(cudaFree(context->levels));
+		CUDA_CHECK_RETURN(cudaFree(context->inFrontierSize));
 		CUDA_CHECK_RETURN(cudaFree(context->inputFrontier));
+		CUDA_CHECK_RETURN(cudaFree(context->outFrontierSize));
 		CUDA_CHECK_RETURN(cudaFree(context->outputFrontier));
 		CUDA_CHECK_RETURN(cudaFree(context->pRand));
 		CUDA_CHECK_RETURN(cudaFree(context->qRand));

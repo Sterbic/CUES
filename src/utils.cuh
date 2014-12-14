@@ -7,8 +7,8 @@
 #ifndef UTILS_CUH_
 #define UTILS_CUH_
 
-#include <stdio.h>
-#include <math.h>
+#include <cstdio>
+#include <algorithm>
 #include <cuda_runtime.h>
 #include <curand.h>
 
@@ -27,7 +27,7 @@
  * Macro for safe curand calls. Will exit the program on detected error.
  */
 #define CURAND_CHECK_RETURN(value) {										\
-	curandStatus_t curandResult = value;											\
+	curandStatus_t curandResult = value;									\
 	if (curandResult != CURAND_STATUS_SUCCESS) {							\
 		fprintf(stderr, "Error %d in curand call at line %d in file %s\n",	\
 				curandResult, __LINE__, __FILE__);							\

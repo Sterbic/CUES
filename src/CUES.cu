@@ -1,15 +1,9 @@
 /**
- * Copyright 1993-2012 NVIDIA Corporation.  All rights reserved.
- *
- * Please refer to the NVIDIA end user license agreement (EULA) associated
- * with this source code for terms and conditions that govern your use of
- * this software. Any use, reproduction, disclosure, or distribution of
- * this software and related documentation outside the terms of the EULA
- * is strictly prohibited.
+ * Main module of the CUES project.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <curand.h>
 
 #include "utils.cuh"
@@ -121,9 +115,17 @@ int main(int argc, char **argv) {
 
 	printf("\nCreating simulation context... ");
 	SimulationContext *context = createSimulationContext(graph);
-	printf("DONE\n");
+	printf("DONE\n\n");
 
-	generatePQRandoms(context);
+	for(int simulation = 1; simulation <= simulations; simulation++) {
+		printf("Running %d. simulation... ", simulation);
+
+		prepareSimulationContext(context, patientZero);
+
+		// DO STUFF
+
+		printf(" DONE\n");
+	}
 
 	freeSimulationContext(context);
 	freeGraph(graph);
