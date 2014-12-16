@@ -3,11 +3,11 @@
 
 #include <stdlib.h>
 #include <curand.h>
+#include <curand_kernel.h>
 
+#include "globals.cuh"
 #include "utils.cuh"
 #include "graph.cuh"
-
-#define SEED 5
 
 /**
  * A structure to store all the data and parameters needed for a simualtion.
@@ -22,7 +22,7 @@
  * inputFrontier[CSize]: the input edge frontier
  * outFrontierSize: the current size of the output frontier
  * outputFrontier[CSize]: the output edge frontier
- * prng: the random generator used in the simulations
+ * randState[MAX_THREADS]: the state of the prng for each thread
  * pRand[N]: probabilities to be avaluated agains p (infect neighbors)
  * qRand[N]: probabilities to be avaluated agains q (recover)
  */
@@ -36,7 +36,7 @@ typedef struct {
 	unsigned int *inputFrontier;
 	unsigned int *outFrontierSize;
 	unsigned int *outputFrontier;
-	curandGenerator_t prng;
+	curandState *randStates;
 	float *pRand;
 	float *qRand;
 } SimulationContext;
@@ -86,12 +86,9 @@ SimulationContext *createSimulationContext(Graph *graph) {
 			&context->outputFrontier, context->CSize * sizeof(unsigned int)
 	));
 
-    CURAND_CHECK_RETURN(curandCreateGenerator(
-    		&context->prng, CURAND_RNG_PSEUDO_DEFAULT
-	));
-
-    CURAND_CHECK_RETURN(curandSetPseudoRandomGeneratorSeed(
-    		context->prng, SEED
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->randStates,
+			BLOCK_SIZE * MAX_GRID_SIZE * sizeof(curandState)
 	));
 
     CUDA_CHECK_RETURN(cudaMalloc(
@@ -103,21 +100,6 @@ SimulationContext *createSimulationContext(Graph *graph) {
 	));
 
 	return context;
-}
-
-/**
- * Fills the pRand and qRand device arrays of the given context with uniform
- * random floats from the <0-1] interval.
- * context: the context pointer returned by createSimulationContext
- */
-void generatePQRandoms(SimulationContext *context) {
-    CURAND_CHECK_RETURN(curandGenerateUniform(
-    		context->prng, context->pRand, context->nodes
-	));
-
-    CURAND_CHECK_RETURN(curandGenerateUniform(
-    		context->prng, context->qRand, context->nodes
-	));
 }
 
 /**
@@ -152,6 +134,24 @@ void prepareSimulationContext(SimulationContext *context, unsigned int src) {
 }
 
 /**
+ * Returns the size of the input frontier stored on the device.
+ * context: the context pointer returned by createSimulationContext
+ * returns: the size of the input frontier
+ */
+unsigned int getInputFrontierSize(SimulationContext *context) {
+	unsigned int frontierSize;
+
+	CUDA_CHECK_RETURN(cudaMemcpy(
+			&frontierSize,
+			context->inFrontierSize,
+			sizeof(unsigned int),
+			cudaMemcpyDeviceToHost
+	));
+
+	return frontierSize;
+}
+
+/**
  * Free the memory allocated by a call to createSimulationContext
  * context: the context pointer returned by createSimulationContext
  */
@@ -164,10 +164,9 @@ void freeSimulationContext(SimulationContext *context) {
 		CUDA_CHECK_RETURN(cudaFree(context->inputFrontier));
 		CUDA_CHECK_RETURN(cudaFree(context->outFrontierSize));
 		CUDA_CHECK_RETURN(cudaFree(context->outputFrontier));
+		CUDA_CHECK_RETURN(cudaFree(context->randStates));
 		CUDA_CHECK_RETURN(cudaFree(context->pRand));
 		CUDA_CHECK_RETURN(cudaFree(context->qRand));
-
-		CURAND_CHECK_RETURN(curandDestroyGenerator(context->prng));
 
 		free(context);
 	}

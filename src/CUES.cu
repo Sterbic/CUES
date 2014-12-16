@@ -5,10 +5,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <curand.h>
+#include <cuda_runtime.h>
+#include <curand_kernel.h>
 
 #include "utils.cuh"
 #include "graph.cuh"
 #include "simulation.cuh"
+#include "kernels.cuh"
 
 __device__ unsigned int bitreverse(unsigned int number) {
 	number = ((0xf0f0f0f0 & number) >> 4) | ((0x0f0f0f0f & number) << 4);
@@ -115,14 +118,33 @@ int main(int argc, char **argv) {
 
 	printf("\nCreating simulation context... ");
 	SimulationContext *context = createSimulationContext(graph);
+	printf("DONE\n");
+
+	printf("\nInitializing random generator states... ");
+	initRandoms<<<BLOCK_SIZE, MAX_GRID_SIZE>>>(context->randStates, SEED);
 	printf("DONE\n\n");
 
 	for(int simulation = 1; simulation <= simulations; simulation++) {
-		printf("Running %d. simulation... ", simulation);
+		CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 
+		printf("Running %d. simulation... ", simulation);
 		prepareSimulationContext(context, patientZero);
 
-		// DO STUFF
+		// do while input size != 0
+		unsigned int inputSize = getInputFrontierSize(context);
+
+		unsigned int blocks = (inputSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
+		blocks = min(blocks, MAX_GRID_SIZE);
+
+		printf("%d %d", inputSize, blocks);
+
+		generateRandForFrontier<<<BLOCK_SIZE, blocks>>>(
+				context->randStates,
+				context->inputFrontier,
+				context->inFrontierSize,
+				context->pRand,
+				context->qRand
+		);
 
 		printf(" DONE\n");
 	}

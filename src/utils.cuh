@@ -235,11 +235,34 @@ void printFloatArray(float *array, int size, bool onHost) {
 				(void *) array,
 				(void **) &printArray,
 				size * sizeof(float)
-				));
+		));
 	}
 
 	for(int i = 0; i < size; i++) {
 		printf("%.5f", printArray[i]);
+		printf(i == size - 1 ? "\n" : ", ");
+	}
+}
+
+/**
+ * Prints the given int array to stdout.
+ * array: the source array
+ * size: the size of the array
+ * onHost: true if the array is in host memory, false if it's on the device
+ */
+void printIntArray(int *array, int size, bool onHost) {
+	int *printArray = array;
+
+	if(!onHost) {
+		CUDA_CHECK_RETURN(cudaGetHostCopy(
+				(void *) array,
+				(void **) &printArray,
+				size * sizeof(int)
+		));
+	}
+
+	for(int i = 0; i < size; i++) {
+		printf("%d", printArray[i]);
 		printf(i == size - 1 ? "\n" : ", ");
 	}
 }
