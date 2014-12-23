@@ -4,13 +4,15 @@
 Graph generating script.
 
 Utility script for the CUES project to generate well known graphs such
-as chains, cycles and complete graphs with the given number of nodes.
+as chains, cycles, wheels and complete graphs with the given number of
+nodes.
 
 Usage:
     python3 make_graph.py type nodes path
 
 Args:
-    type: the type of the graph to create, [chain, cycle, complete]
+    type: the type of the graph to create, [chain, cycle, wheel,
+        complete]
     nodes: the total number of nodes in the graph
     path: the path to the output file where the graph will be saved
 """
@@ -18,7 +20,7 @@ __author__ = "Luka Sterbic"
 
 import sys
 
-GRAPH_TYPES = {"chain", "cycle", "complete"}
+GRAPH_TYPES = {"chain", "cycle", "wheel", "complete"}
 
 
 def main(graph_type, nodes, output):
@@ -26,8 +28,8 @@ def main(graph_type, nodes, output):
         raise ValueError("Unknown graph type.")
 
     nodes = int(nodes)
-    if nodes < 3:
-        raise ValueError("The number of nodes must be at least 3.")
+    if nodes < 4:
+        raise ValueError("The number of nodes must be at least 4.")
 
     with open(output, "w") as file:
         file.write("# %s_%d\n\n" % (graph_type, nodes))
@@ -36,6 +38,8 @@ def main(graph_type, nodes, output):
             _create_chain(nodes, file)
         elif graph_type == "cycle":
             _create_cycle(nodes, file)
+        elif graph_type == "wheel":
+            _create_wheel(nodes, file)
         elif graph_type == "complete":
             _create_complete(nodes, file)
 
@@ -48,6 +52,13 @@ def _create_chain(nodes, output_file):
 def _create_cycle(nodes, output_file):
     _create_chain(nodes, output_file)
     output_file.write("%d %d\n" % (0, nodes - 1))
+
+
+def _create_wheel(nodes, output_file):
+    _create_cycle(nodes - 1, output_file)
+
+    for node in range(nodes - 1):
+        output_file.write("%d %d\n" % (node, nodes - 1))
 
 
 def _create_complete(nodes, output_file):

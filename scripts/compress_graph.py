@@ -31,12 +31,6 @@ class Graph(object):
             self.compressed_id = None
             self.neighbors = []
 
-        def __str__(self):
-            return "%d: %s" % (self.node_id, str(self.neighbors))
-
-        def __repr__(self):
-            return self.__str__()
-
     def __init__(self, name):
         self.name = name
         self.nodes = {}
