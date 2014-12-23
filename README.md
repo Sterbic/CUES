@@ -50,7 +50,7 @@ A more detailed explanation of the usage and implemented algorithm may be viewed
 5) Acknowledgments
 ---------------------
 
-The BFS parallelization used in CUES is largely based on paper by Duane Merrill, Michael Garland and Andrew Grimshaw, [Scalable GPU Graph Traversal][1].
+The BFS parallelization used in CUES is largely based on a paper by Duane Merrill, Michael Garland and Andrew Grimshaw: [Scalable GPU Graph Traversal][1].
 
 
 [1]: https://research.nvidia.com/publication/scalable-gpu-graph-traversal "Scalable GPU Graph Traversal"
