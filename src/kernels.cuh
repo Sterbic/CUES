@@ -51,20 +51,22 @@ __global__ void generateRandForFrontier(curandState *states,
 __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int nodes,	unsigned int *R, unsigned int *C,
 		unsigned int *inFrontierSize, unsigned int *inputFrontier,
+		unsigned int *outFrontierSize, unsigned int *outputFrontier,
 		int *infected, bool *didInfectNeighbors, float *pRand, float *qRand) {
 	// structure for warp culling
-	__shared__ unsigned int scratch[WARPS_PER_BLOCK][128];
+	__shared__ unsigned int warpScratch[WARPS_PER_BLOCK][128];
 
 	// structure for history culling
 	__shared__ unsigned int history[HISTORY_SIZE];
 
 	// strucutre for the prescan calculations
-	__shared__ unsigned int scanBuffer[BLOCK_SIZE][2];
+	__shared__ unsigned int threadScratch[BLOCK_SIZE][3];
 
 	// init indices
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 	int localTid = threadIdx.x;
-	int warpId = blockIdx.x / WARP_SIZE;
+	int warpId = threadIdx.x / WARP_SIZE;
+	int laneId = threadIdx.x % WARP_SIZE;
 
 	int offset = 0;
 	unsigned int frontierSize = *inFrontierSize;
@@ -86,12 +88,12 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// do warp culling
 		unsigned int hash = node & 127;
-		scratch[warpId][hash] = node;
+		warpScratch[warpId][hash] = node;
 
-		if(scratch[warpId][hash] == node) {
-			scratch[warpId][hash] = localTid;
+		if(warpScratch[warpId][hash] == node) {
+			warpScratch[warpId][hash] = localTid;
 
-			if(scratch[warpId][hash] != localTid) {
+			if(warpScratch[warpId][hash] != localTid) {
 				duplicate = true;
 			}
 		}
@@ -126,16 +128,22 @@ __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int rStart = 0;
 		unsigned int rEnd = 0;
 
+		// do test for expansion
 		if(shouldExpand) {
-			rStart = R[node];
-			rEnd = R[node + 1];
+			float pTest = pRand[node];
+
+			// if test is successful load offsets in C
+			if(pTest < p) {
+				rStart = R[node];
+				rEnd = R[node + 1];
+			}
 		}
 
 		// calculate size for coarse and fine grained node gathering
-
-		unsigned int rLength = rEnd - rStart + !didRecover;
+		unsigned int rLength = rEnd - rStart;
 		unsigned int coarseSize = 0;
 		unsigned int fineSize = 0;
+		unsigned int recoverySize = 0;
 
 		if(rLength > WARP_SIZE) {
 			coarseSize = rLength;
@@ -147,8 +155,9 @@ __global__ void contractExpand(int iteration, float p, float q,
 		__syncthreads();
 
 		int offset = 1;
-		scanBuffer[localTid][0] = coarseSize;
-		scanBuffer[localTid][1] = fineSize;
+		threadScratch[localTid][0] = coarseSize;
+		threadScratch[localTid][1] = fineSize;
+		threadScratch[localTid][2] = !didRecover;
 
 		// reduce phase
 		for(int d = BLOCK_SIZE >> 1; d > 0; d >>= 1, offset <<= 1) {
@@ -158,14 +167,16 @@ __global__ void contractExpand(int iteration, float p, float q,
 				int ai = offset * (2 * localTid + 1) - 1;
 				int bi = offset * (2 * localTid + 2) - 1;
 
-				scanBuffer[bi][0] += scanBuffer[ai][0];
-				scanBuffer[bi][1] += scanBuffer[ai][1];
+				threadScratch[bi][0] += threadScratch[ai][0];
+				threadScratch[bi][1] += threadScratch[ai][1];
+				threadScratch[bi][2] += threadScratch[ai][2];
 			}
 		}
 
 		if(localTid == 0) {
-			scanBuffer[BLOCK_SIZE - 1][0] = 0;
-			scanBuffer[BLOCK_SIZE - 1][1] = 0;
+			threadScratch[BLOCK_SIZE - 1][0] = 0;
+			threadScratch[BLOCK_SIZE - 1][1] = 0;
+			threadScratch[BLOCK_SIZE - 1][2] = 0;
 		}
 
 		// up-sweep phase
@@ -177,25 +188,171 @@ __global__ void contractExpand(int iteration, float p, float q,
 				int ai = offset * (2 * localTid + 1) - 1;
 				int bi = offset * (2 * localTid + 2) - 1;
 
-				unsigned int temp = scanBuffer[ai][0];
-				scanBuffer[ai][0] = scanBuffer[bi][0];
-				scanBuffer[bi][0] += temp;
+				unsigned int temp = threadScratch[ai][0];
+				threadScratch[ai][0] = threadScratch[bi][0];
+				threadScratch[bi][0] += temp;
 
-				temp = scanBuffer[ai][1];
-				scanBuffer[ai][1] = scanBuffer[bi][1];
-				scanBuffer[bi][1] += temp;
+				temp = threadScratch[ai][1];
+				threadScratch[ai][1] = threadScratch[bi][1];
+				threadScratch[bi][1] += temp;
+
+				temp = threadScratch[ai][2];
+				threadScratch[ai][2] = threadScratch[bi][2];
+				threadScratch[bi][2] += temp;
+			}
 		}
 
 		__syncthreads();
 
-		// to be continued ...
+		// calculate global enqueue offset
+		if(localTid == BLOCK_SIZE - 1) {
+			unsigned int coarseTotal = threadScratch[BLOCK_SIZE - 1][0] +
+					coarseSize;
+			unsigned int fineTotal = threadScratch[BLOCK_SIZE - 1][1] +
+					fineSize;
+			unsigned int recoveryTotal = threadScratch[BLOCK_SIZE - 1][2] +
+					recoverySize;
 
-		// fetch test values if they will be needed
-		float pTest = 0;
+			unsigned int total = coarseTotal + fineTotal + recoveryTotal;
+			unsigned int baseOffset = atomicAdd(outFrontierSize, total);
 
+			warpScratch[0][0] = baseOffset;
+			warpScratch[0][1] = coarseTotal;
+			warpScratch[0][2] = fineTotal;
+		}
 
-		if(shouldExpand) {
-			pTest = pRand[node];
+		__syncthreads();
+
+		// broadcast base enqueue offset and totals
+		unsigned int baseOffset = warpScratch[0][0];
+		unsigned int coarseTotal = warpScratch[0][1];
+		unsigned int fineTotal = warpScratch[0][2];
+
+		// set the flag for block coarse gathering
+		if(localTid == 0) {
+			warpScratch[0][0] = BLOCK_SIZE;
+		}
+
+		__syncthreads();
+
+		// perform coarse grained block gathering
+		while(true) {
+			// all threads with enough nodes vie for control
+			if(coarseSize >= BLOCK_SIZE) {
+				warpScratch[0][0] = localTid;
+			}
+
+			__syncthreads();
+
+			// get the winner and wxit the loop if all threads are done
+			unsigned int winner = warpScratch[0][0];
+			if(winner == BLOCK_SIZE) {
+				break;
+			}
+
+			// winner thread broadcasts its offsets
+			if(localTid == winner) {
+				warpScratch[0][0] = BLOCK_SIZE;
+				warpScratch[0][1] = rStart;
+				warpScratch[0][2] = rEnd;
+			}
+
+			__syncthreads();
+
+			unsigned int outOffset = baseOffset + threadScratch[winner][0] +
+								localTid;
+
+			// get bounds is C
+			unsigned int cIndex = warpScratch[warpId][1] + localTid;
+			unsigned int cLast = warpScratch[warpId][2];
+
+			// gather nodes, BLOCK_SIZE at a time
+			while(cIndex < cLast) {
+				unsigned int neighbor = C[cIndex];
+
+				// store gathered neighbor in output frontier
+				outFrontierSize[outOffset] = neighbor;
+
+				outOffset += BLOCK_SIZE;
+				cIndex += BLOCK_SIZE;
+			}
+		}
+
+		// perform coarse grained warp gathering
+		while(__any(coarseSize)) {
+			// vie for control of the warp
+			if(coarseSize != 0) {
+				warpScratch[warpId][0] = localTid;
+			}
+
+			// winner broadcasts its offsets
+			if(warpScratch[warpId][0] == localTid) {
+				warpScratch[warpId][1] = rStart;
+				warpScratch[warpId][2] = rEnd;
+				coarseSize = 0;
+			}
+
+			// get the local tid of the winner and its scatter offset
+			unsigned int winner = warpScratch[warpId][0];
+			unsigned int outOffset = baseOffset + threadScratch[winner][0] +
+					laneId;
+
+			// get bounds is C
+			unsigned int cIndex = warpScratch[warpId][1] + laneId;
+			unsigned int cLast = warpScratch[warpId][2];
+
+			// gather nodes, WARP_SIZE at a time
+			while(cIndex < cLast) {
+				unsigned int neighbor = C[cIndex];
+
+				// store gathered neighbor in output frontier
+				outFrontierSize[outOffset] = neighbor;
+
+				outOffset += WARP_SIZE;
+				cIndex += WARP_SIZE;
+			}
+		}
+
+		// perform fine grained gathering
+		unsigned int blockProgress = 0;
+		unsigned int remain;
+		unsigned int fineOffset = threadScratch[localTid][1];
+
+		__syncthreads();
+
+		// loop while there are nodes to gather
+		while((remain = fineTotal - blockProgress) > 0) {
+			// load positions in shared memory
+			while((fineOffset < blockProgress + BLOCK_SIZE) &&
+					(fineSize != 0)) {
+				threadScratch[fineOffset - blockProgress][0] = rStart;
+				fineOffset++;
+				rStart++;
+			}
+
+			// wait for all threads to load the shared buffer
+			__syncthreads();
+
+			// gather nodes
+			if(localTid < remain) {
+				unsigned int cIndex = threadScratch[localTid][0];
+				unsigned int neighbor = C[cIndex];
+
+				// store gathered neighbor in output frontier
+				unsigned int outOffset = baseOffset + coarseTotal +
+						blockProgress + localTid;
+				outFrontierSize[outOffset] = neighbor;
+			}
+
+			blockProgress += BLOCK_SIZE;
+			__syncthreads();
+		}
+
+		// perform recovery gahtering
+		if(!didRecover) {
+			unsigned int outOffset = baseOffset + coarseTotal + fineTotal +
+					threadScratch[localTid][2];
+			outputFrontier[outOffset] = node;
 		}
 	}
 }

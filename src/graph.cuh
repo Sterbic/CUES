@@ -18,7 +18,8 @@ using namespace std;
  * The network graph used in the simulation. Stored in CSR format.
  * N: number of nodes
  * M: number of edges
- * R[N+1]: contains the indices in C for the start of the adjacency lists
+ * R[N+2]: contains the indices in C for the start of the adjacency lists and a
+ * dummy node for padding purposes
  * CSize: the size of the concatenated adjacency lists, 2 * M
  * C[CSize]: concatenated adjacency lists
  */
@@ -71,7 +72,7 @@ Graph *loadGraph(const char *path) {
 
 	graph->N = maxIndex + 1;
 	graph->M = M;
-	graph->R = (unsigned int *) malloc((graph->N + 1) * sizeof(unsigned int));
+	graph->R = (unsigned int *) malloc((graph->N + 2) * sizeof(unsigned int));
 	graph->CSize = 2 * M;
 	graph->C = (unsigned int *) malloc(graph->CSize * sizeof(unsigned int));
 
@@ -90,6 +91,8 @@ Graph *loadGraph(const char *path) {
 	}
 
 	graph->R[graph->N] = cIndex;
+	graph->R[graph->N + 1] = cIndex;
+
 	return graph;
 }
 
