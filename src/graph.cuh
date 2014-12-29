@@ -18,21 +18,24 @@ using namespace std;
  * The network graph used in the simulation. Stored in CSR format.
  * N: number of nodes
  * M: number of edges
- * R[N+2]: contains the indices in C for the start of the adjacency lists and a
- * dummy node for padding purposes
+ * RSize: the size of the R array, N + 2
+ * R[RSize]: contains the indices in C for the start of the adjacency lists and a
+ * dummy node for device padding purposes
  * CSize: the size of the concatenated adjacency lists, 2 * M
  * C[CSize]: concatenated adjacency lists
  */
 typedef struct {
 	unsigned int N;
 	unsigned int M;
+	unsigned int RSize;
 	unsigned int *R;
 	unsigned int CSize;
 	unsigned int *C;
 } Graph;
 
 /**
- * Load the a graph stored in edge list format.
+ * Load the a graph stored in edge list format. Adds a dummy isolated node. The
+ * dummy node will have ID N.
  * path: the path to the input file
  * returns: a pointer to the created graph
  */
@@ -71,8 +74,9 @@ Graph *loadGraph(const char *path) {
 	exitIf(graph == NULL, "Error allocating graph structure.");
 
 	graph->N = maxIndex + 1;
+	graph->RSize = graph->N + 2;
 	graph->M = M;
-	graph->R = (unsigned int *) malloc((graph->N + 2) * sizeof(unsigned int));
+	graph->R = (unsigned int *) malloc(graph->RSize * sizeof(unsigned int));
 	graph->CSize = 2 * M;
 	graph->C = (unsigned int *) malloc(graph->CSize * sizeof(unsigned int));
 
@@ -90,8 +94,8 @@ Graph *loadGraph(const char *path) {
 		}
 	}
 
-	graph->R[graph->N] = cIndex;
-	graph->R[graph->N + 1] = cIndex;
+	graph->R[graph->RSize - 2] = cIndex;
+	graph->R[graph->RSize - 1] = cIndex;
 
 	return graph;
 }

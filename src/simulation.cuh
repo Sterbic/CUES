@@ -53,13 +53,13 @@ SimulationContext *createSimulationContext(Graph *graph) {
 			(SimulationContext *) malloc(sizeof(SimulationContext));
 	exitIf(context == NULL, "Error allocating simulation context.");
 
-	context->nodes = graph->N;
+	context->nodes = graph->N + 1;
 	context->CSize = graph->CSize;
 
 	CUDA_CHECK_RETURN(cudaGetDeviceCopy(
 			(void *) graph->R,
 			(void **) &context->R,
-			(graph->N + 1) * sizeof(unsigned int)
+			(graph->RSize) * sizeof(unsigned int)
 	));
 
 	CUDA_CHECK_RETURN(cudaGetDeviceCopy(
@@ -137,6 +137,25 @@ void prepareSimulationContext(SimulationContext *context, unsigned int src) {
 			sizeof(unsigned int),
 			cudaMemcpyHostToDevice
 	));
+
+	CUDA_CHECK_RETURN(cudaMemset(
+			context->outFrontierSize, 0, sizeof(unsigned int)
+	));
+}
+
+/**
+ * Called when an iteration of the simulaion is completed. Prepares the context
+ * for the next iteration.
+ * context: the context pointer returned by createSimulationContext
+ */
+void iterationDone(SimulationContext *context) {
+	unsigned int *temp = context->inFrontierSize;
+	context->inFrontierSize = context->outFrontierSize;
+	context->outFrontierSize = temp;
+
+	temp = context->inputFrontier;
+	context->inputFrontier = context->outputFrontier;
+	context->outputFrontier = temp;
 
 	CUDA_CHECK_RETURN(cudaMemset(
 			context->outFrontierSize, 0, sizeof(unsigned int)

@@ -110,6 +110,9 @@ int main(int argc, char **argv) {
 	Graph *graph = loadGraph(graphPath);
 	printf("DONE\n");
 
+	printIntArray((int *)graph->R, graph->RSize, true);
+	printIntArray((int *) graph->C, graph->CSize, true);
+
 	exitIf(patientZero < 0 || patientZero > graph->N - 1,
 			"Source node is not present in the input graph.");
 
@@ -121,7 +124,7 @@ int main(int argc, char **argv) {
 	printf("DONE\n");
 
 	printf("\nInitializing random generator states... ");
-	initRandoms<<<BLOCK_SIZE, MAX_GRID_SIZE>>>(context->randStates, SEED);
+	initRandoms<<<MAX_GRID_SIZE, BLOCK_SIZE>>>(context->randStates, SEED);
 	printf("DONE\n\n");
 
 	for(int simulation = 1; simulation <= simulations; simulation++) {
@@ -130,25 +133,53 @@ int main(int argc, char **argv) {
 		printf("Running %d. simulation... ", simulation);
 		prepareSimulationContext(context, patientZero);
 
-		// do while input size != 0
-		unsigned int inputSize = getInputFrontierSize(context);
+		int iteration = 0;
+		unsigned int inputSize = 1;
 
-		unsigned int blocks = (inputSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
-		blocks = min(blocks, MAX_GRID_SIZE);
+		do {
+			unsigned int blocks = (inputSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
+			blocks = min(blocks, MAX_GRID_SIZE);
 
-		printf("%d %d", inputSize, blocks);
+			printf("Input size, blocks: %d %d\n", inputSize, blocks);
 
-		generateRandForFrontier<<<BLOCK_SIZE, blocks>>>(
-				context->randStates,
-				context->inputFrontier,
-				context->inFrontierSize,
-				context->pRand,
-				context->qRand
-		);
+			generateRandForFrontier<<<blocks, BLOCK_SIZE>>>(
+					context->randStates,
+					context->inputFrontier,
+					context->inFrontierSize,
+					context->pRand,
+					context->qRand
+			);
+
+			contractExpand<<<blocks, BLOCK_SIZE>>>(
+					iteration,
+					p,
+					q,
+					context->nodes,
+					context->R,
+					context->C,
+					context->inFrontierSize,
+					context->inputFrontier,
+					context->outFrontierSize,
+					context->outputFrontier,
+					context->infected,
+					context->didInfectNeighbors,
+					context->pRand,
+					context->qRand
+			);
+
+			iterationDone(context);
+			iteration++;
+
+			inputSize = getInputFrontierSize(context);
+			printf("Frontier size: %u -> ", inputSize);
+			printIntArray((int *) context->inputFrontier, inputSize, false);
+		} while(iteration < 4); // inputSize != 0
 
 		printf(" DONE\n");
 	}
 
 	freeSimulationContext(context);
 	freeGraph(graph);
+
+	CUDA_CHECK_RETURN(cudaDeviceReset());
 }

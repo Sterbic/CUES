@@ -57,16 +57,26 @@ __global__ void contractExpand(int iteration, float p, float q,
 	__shared__ unsigned int warpScratch[WARPS_PER_BLOCK][128];
 
 	// structure for history culling
-	__shared__ unsigned int history[HISTORY_SIZE];
+	__shared__ int history[HISTORY_SIZE];
 
 	// strucutre for the prescan calculations
 	__shared__ unsigned int threadScratch[BLOCK_SIZE][3];
 
 	// init indices
-	int tid = blockIdx.x * blockDim.x + threadIdx.x;
-	int localTid = threadIdx.x;
-	int warpId = threadIdx.x / WARP_SIZE;
-	int laneId = threadIdx.x % WARP_SIZE;
+	unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	unsigned int localTid = threadIdx.x;
+	unsigned int warpId = threadIdx.x / WARP_SIZE;
+	unsigned int laneId = threadIdx.x % WARP_SIZE;
+
+	// init history hash table
+	unsigned int historyOffset = 0;
+
+	while(localTid + historyOffset < HISTORY_SIZE) {
+		history[localTid + historyOffset] = -1;
+		historyOffset += BLOCK_SIZE;
+	}
+
+	__syncthreads();
 
 	int offset = 0;
 	unsigned int frontierSize = *inFrontierSize;
@@ -74,11 +84,15 @@ __global__ void contractExpand(int iteration, float p, float q,
 	while(offset < frontierSize) {
 		// get the node and all the flags for the current thread
 		// initially assign to dummy node
-		unsigned int node = nodes;
+		unsigned int node = nodes - 1;
 
 		// test if the thread is assigned to a valid node
 		if(tid + offset < frontierSize) {
 			node = inputFrontier[tid + offset];
+		}
+
+		if(tid < 5) {
+			printf("1 # Thread: %u, Node: %u\n", localTid, node);
 		}
 
 		offset += gridDim.x * blockDim.x;
@@ -98,11 +112,19 @@ __global__ void contractExpand(int iteration, float p, float q,
 			}
 		}
 
+		if(tid < 5) {
+			printf("2 # Thread: %u, Node: %u, dup: %d\n", localTid, node, duplicate);
+		}
+
 		// test history if node is not a duplicate
 		unsigned int historyHash = node & (HISTORY_SIZE - 1);
 
 		if(!duplicate && history[historyHash] == node) {
 			duplicate = true;
+		}
+
+		if(tid < 5) {
+			printf("3 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
 		}
 
 		bool shouldVisit = false;
@@ -121,8 +143,10 @@ __global__ void contractExpand(int iteration, float p, float q,
 		}
 
 		// try to recover the current node
-		float qTest = qRand[node];
-		bool didRecover = qTest < q;
+		bool didRecover = true;
+		if(node != nodes - 1) {
+			didRecover = qRand[node] < q;
+		}
 
 		// fetch adjacency list offsets if needed
 		unsigned int rStart = 0;
@@ -139,16 +163,24 @@ __global__ void contractExpand(int iteration, float p, float q,
 			}
 		}
 
+		if(tid < 5) {
+			printf("4 # Thread: %u, Node: %u, dup: %d, visit: %d, exp: %d\n", threadIdx.x, node, duplicate, shouldVisit, shouldExpand);
+		}
+
 		// calculate size for coarse and fine grained node gathering
 		unsigned int rLength = rEnd - rStart;
 		unsigned int coarseSize = 0;
 		unsigned int fineSize = 0;
-		unsigned int recoverySize = 0;
+		unsigned int recoverySize = !didRecover;
 
 		if(rLength > WARP_SIZE) {
 			coarseSize = rLength;
 		} else {
 			fineSize = rLength;
+		}
+
+		if(tid < 5 || !duplicate) {
+			printf("5 # Thread: %u, Node: %u, coarse: %u, fine: %u, rec: %u\n", threadIdx.x, node, coarseSize, fineSize, recoverySize);
 		}
 
 		// do prescan to determin local enqueue offsets
@@ -157,7 +189,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 		int offset = 1;
 		threadScratch[localTid][0] = coarseSize;
 		threadScratch[localTid][1] = fineSize;
-		threadScratch[localTid][2] = !didRecover;
+		threadScratch[localTid][2] = recoverySize;
 
 		// reduce phase
 		for(int d = BLOCK_SIZE >> 1; d > 0; d >>= 1, offset <<= 1) {
@@ -216,6 +248,8 @@ __global__ void contractExpand(int iteration, float p, float q,
 			unsigned int total = coarseTotal + fineTotal + recoveryTotal;
 			unsigned int baseOffset = atomicAdd(outFrontierSize, total);
 
+			printf("6 # base: %u, coarse: %u, fine: %u\n", baseOffset, coarseTotal, fineTotal);
+
 			warpScratch[0][0] = baseOffset;
 			warpScratch[0][1] = coarseTotal;
 			warpScratch[0][2] = fineTotal;
@@ -238,7 +272,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 		// perform coarse grained block gathering
 		while(true) {
 			// all threads with enough nodes vie for control
-			if(coarseSize >= BLOCK_SIZE) {
+			if(coarseSize > BLOCK_SIZE) {
 				warpScratch[0][0] = localTid;
 			}
 
@@ -255,6 +289,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 				warpScratch[0][0] = BLOCK_SIZE;
 				warpScratch[0][1] = rStart;
 				warpScratch[0][2] = rEnd;
+				coarseSize = 0;
 			}
 
 			__syncthreads();
@@ -263,15 +298,15 @@ __global__ void contractExpand(int iteration, float p, float q,
 								localTid;
 
 			// get bounds is C
-			unsigned int cIndex = warpScratch[warpId][1] + localTid;
-			unsigned int cLast = warpScratch[warpId][2];
+			unsigned int cIndex = warpScratch[0][1] + localTid;
+			unsigned int cLast = warpScratch[0][2];
 
 			// gather nodes, BLOCK_SIZE at a time
 			while(cIndex < cLast) {
 				unsigned int neighbor = C[cIndex];
 
 				// store gathered neighbor in output frontier
-				outFrontierSize[outOffset] = neighbor;
+				outputFrontier[outOffset] = neighbor;
 
 				outOffset += BLOCK_SIZE;
 				cIndex += BLOCK_SIZE;
@@ -306,7 +341,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 				unsigned int neighbor = C[cIndex];
 
 				// store gathered neighbor in output frontier
-				outFrontierSize[outOffset] = neighbor;
+				outputFrontier[outOffset] = neighbor;
 
 				outOffset += WARP_SIZE;
 				cIndex += WARP_SIZE;
@@ -315,16 +350,21 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// perform fine grained gathering
 		unsigned int blockProgress = 0;
-		unsigned int remain;
 		unsigned int fineOffset = threadScratch[localTid][1];
+		int remain = fineTotal;
+
+		if(tid < 5) {
+			printf("7 # Thread: %u, rStart: %u, rEnd: %u, remain: %u, offset: %d\n", threadIdx.x, rStart, rEnd, remain, fineOffset);
+		}
 
 		__syncthreads();
 
 		// loop while there are nodes to gather
-		while((remain = fineTotal - blockProgress) > 0) {
+		while(remain > 0) {
 			// load positions in shared memory
 			while((fineOffset < blockProgress + BLOCK_SIZE) &&
-					(fineSize != 0)) {
+					(rStart < rEnd)) {
+				printf("8 # Thread: %u, rStart: %u, index: %u\n", threadIdx.x, rStart, fineOffset - blockProgress);
 				threadScratch[fineOffset - blockProgress][0] = rStart;
 				fineOffset++;
 				rStart++;
@@ -341,10 +381,14 @@ __global__ void contractExpand(int iteration, float p, float q,
 				// store gathered neighbor in output frontier
 				unsigned int outOffset = baseOffset + coarseTotal +
 						blockProgress + localTid;
-				outFrontierSize[outOffset] = neighbor;
+				outputFrontier[outOffset] = neighbor;
+
+				printf("9 # Thread: %u, Node: %u, index: %u\n", threadIdx.x, neighbor, outOffset);
 			}
 
 			blockProgress += BLOCK_SIZE;
+			remain -= BLOCK_SIZE;
+
 			__syncthreads();
 		}
 
