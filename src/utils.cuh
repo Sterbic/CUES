@@ -267,4 +267,27 @@ void printIntArray(int *array, int size, bool onHost) {
 	}
 }
 
+/**
+ * Prints the given bool array to stdout.
+ * array: the source array
+ * size: the size of the array
+ * onHost: true if the array is in host memory, false if it's on the device
+ */
+void printBoolArray(bool *array, int size, bool onHost) {
+	bool *printArray = array;
+
+	if(!onHost) {
+		CUDA_CHECK_RETURN(cudaGetHostCopy(
+				(void *) array,
+				(void **) &printArray,
+				size * sizeof(bool)
+		));
+	}
+
+	for(int i = 0; i < size; i++) {
+		printf("%d", printArray[i]);
+		printf(i == size - 1 ? "\n" : ", ");
+	}
+}
+
 #endif

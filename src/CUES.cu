@@ -162,6 +162,7 @@ int main(int argc, char **argv) {
 					context->outFrontierSize,
 					context->outputFrontier,
 					context->infected,
+					context->immune,
 					context->didInfectNeighbors,
 					context->pRand,
 					context->qRand
@@ -173,8 +174,11 @@ int main(int argc, char **argv) {
 			inputSize = getInputFrontierSize(context);
 			printf("Frontier size: %u -> ", inputSize);
 			printIntArray((int *) context->inputFrontier, inputSize, false);
-		} while(iteration < 4); // inputSize != 0
+		} while(inputSize > 0); // inputSize != 0
 
+		printIntArray(context->infected, context->nodes - 1, false);
+		printBoolArray(context->immune, context->nodes - 1, false);
+		printBoolArray(context->didInfectNeighbors, context->nodes - 1, false);
 		printf(" DONE\n");
 	}
 

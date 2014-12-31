@@ -5,6 +5,8 @@
 #ifndef KERLENS_CUH_
 #define KERLENS_CUH_
 
+#define DEBUG false
+
 #include <curand_kernel.h>
 
 // HISTORY_SIZE must be a power of 2
@@ -52,7 +54,8 @@ __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int nodes,	unsigned int *R, unsigned int *C,
 		unsigned int *inFrontierSize, unsigned int *inputFrontier,
 		unsigned int *outFrontierSize, unsigned int *outputFrontier,
-		int *infected, bool *didInfectNeighbors, float *pRand, float *qRand) {
+		int *infected, bool *immune, bool *didInfectNeighbors, float *pRand,
+		float *qRand) {
 	// structure for warp culling
 	__shared__ unsigned int warpScratch[WARPS_PER_BLOCK][128];
 
@@ -91,28 +94,31 @@ __global__ void contractExpand(int iteration, float p, float q,
 			node = inputFrontier[tid + offset];
 		}
 
-		if(tid < 5) {
+		if(DEBUG && (tid < 5)) {
 			printf("1 # Thread: %u, Node: %u\n", localTid, node);
 		}
 
 		offset += gridDim.x * blockDim.x;
 
 		// test if the node is a duplicate
-		bool duplicate = false;
+		// if the node is immune no action should be performed
+		bool duplicate = immune[node];
 
 		// do warp culling
-		unsigned int hash = node & 127;
-		warpScratch[warpId][hash] = node;
+		if(!duplicate) {
+			unsigned int hash = node & 127;
+			warpScratch[warpId][hash] = node;
 
-		if(warpScratch[warpId][hash] == node) {
-			warpScratch[warpId][hash] = localTid;
+			if(warpScratch[warpId][hash] == node) {
+				warpScratch[warpId][hash] = localTid;
 
-			if(warpScratch[warpId][hash] != localTid) {
-				duplicate = true;
+				if(warpScratch[warpId][hash] != localTid) {
+					duplicate = true;
+				}
 			}
 		}
 
-		if(tid < 5) {
+		if(DEBUG && (tid < 5)) {
 			printf("2 # Thread: %u, Node: %u, dup: %d\n", localTid, node, duplicate);
 		}
 
@@ -123,7 +129,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 			duplicate = true;
 		}
 
-		if(tid < 5) {
+		if(DEBUG && (tid < 5)) {
 			printf("3 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
 		}
 
@@ -144,7 +150,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// try to recover the current node
 		bool didRecover = true;
-		if(node != nodes - 1) {
+		if(!duplicate && (node != nodes - 1)) {
 			didRecover = qRand[node] < q;
 		}
 
@@ -156,14 +162,15 @@ __global__ void contractExpand(int iteration, float p, float q,
 		if(shouldExpand) {
 			float pTest = pRand[node];
 
-			// if test is successful load offsets in C
+			// if test is successful load offsets in C and set flag
 			if(pTest < p) {
 				rStart = R[node];
 				rEnd = R[node + 1];
+				didInfectNeighbors[node] = true;
 			}
 		}
 
-		if(tid < 5) {
+		if(DEBUG && (tid < 5)) {
 			printf("4 # Thread: %u, Node: %u, dup: %d, visit: %d, exp: %d\n", threadIdx.x, node, duplicate, shouldVisit, shouldExpand);
 		}
 
@@ -179,7 +186,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 			fineSize = rLength;
 		}
 
-		if(tid < 5 || !duplicate) {
+		if(DEBUG && (tid < 5 || !duplicate)) {
 			printf("5 # Thread: %u, Node: %u, coarse: %u, fine: %u, rec: %u\n", threadIdx.x, node, coarseSize, fineSize, recoverySize);
 		}
 
@@ -248,7 +255,9 @@ __global__ void contractExpand(int iteration, float p, float q,
 			unsigned int total = coarseTotal + fineTotal + recoveryTotal;
 			unsigned int baseOffset = atomicAdd(outFrontierSize, total);
 
-			printf("6 # base: %u, coarse: %u, fine: %u\n", baseOffset, coarseTotal, fineTotal);
+			if(DEBUG) {
+				printf("6 # base: %u, coarse: %u, fine: %u\n", baseOffset, coarseTotal, fineTotal);
+			}
 
 			warpScratch[0][0] = baseOffset;
 			warpScratch[0][1] = coarseTotal;
@@ -353,7 +362,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int fineOffset = threadScratch[localTid][1];
 		int remain = fineTotal;
 
-		if(tid < 5) {
+		if(DEBUG && (tid < 5)) {
 			printf("7 # Thread: %u, rStart: %u, rEnd: %u, remain: %u, offset: %d\n", threadIdx.x, rStart, rEnd, remain, fineOffset);
 		}
 
@@ -364,7 +373,10 @@ __global__ void contractExpand(int iteration, float p, float q,
 			// load positions in shared memory
 			while((fineOffset < blockProgress + BLOCK_SIZE) &&
 					(rStart < rEnd)) {
-				printf("8 # Thread: %u, rStart: %u, index: %u\n", threadIdx.x, rStart, fineOffset - blockProgress);
+				if(DEBUG) {
+					printf("8 # Thread: %u, rStart: %u, index: %u\n", threadIdx.x, rStart, fineOffset - blockProgress);
+				}
+
 				threadScratch[fineOffset - blockProgress][0] = rStart;
 				fineOffset++;
 				rStart++;
@@ -383,7 +395,9 @@ __global__ void contractExpand(int iteration, float p, float q,
 						blockProgress + localTid;
 				outputFrontier[outOffset] = neighbor;
 
-				printf("9 # Thread: %u, Node: %u, index: %u\n", threadIdx.x, neighbor, outOffset);
+				if(DEBUG) {
+					printf("9 # Thread: %u, Node: %u, index: %u\n", threadIdx.x, neighbor, outOffset);
+				}
 			}
 
 			blockProgress += BLOCK_SIZE;
@@ -392,11 +406,15 @@ __global__ void contractExpand(int iteration, float p, float q,
 			__syncthreads();
 		}
 
-		// perform recovery gahtering
-		if(!didRecover) {
-			unsigned int outOffset = baseOffset + coarseTotal + fineTotal +
-					threadScratch[localTid][2];
-			outputFrontier[outOffset] = node;
+		// perform recovery gahtering if needed
+		if(!duplicate) {
+			if(didRecover) {
+				immune[node] = true;
+			} else {
+				unsigned int outOffset = baseOffset + coarseTotal + fineTotal +
+						threadScratch[localTid][2];
+				outputFrontier[outOffset] = node;
+			}
 		}
 	}
 }

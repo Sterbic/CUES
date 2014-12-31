@@ -18,6 +18,7 @@
  * R[N+1]: contains the indices in C for the start of the adjacency lists
  * C[CSize]: concatenated adjacency lists
  * infected[N]: the iteration at which each node was infected
+ * immune[N]: bool array, true if the node is immune
  * didInfectNeighbors[stateSize]: bool array, true if node infected neighbours
  * inFrontierSize: the current size of the input frontier
  * inputFrontier[CSize]: the input edge frontier
@@ -33,6 +34,7 @@ typedef struct {
 	unsigned int *R;
 	unsigned int *C;
 	int *infected;
+	bool *immune;
 	bool *didInfectNeighbors;
 	unsigned int *inFrontierSize;
 	unsigned int *inputFrontier;
@@ -70,6 +72,10 @@ SimulationContext *createSimulationContext(Graph *graph) {
 
 	CUDA_CHECK_RETURN(cudaMalloc(
 			&context->infected, context->nodes * sizeof(int)
+	));
+
+	CUDA_CHECK_RETURN(cudaMalloc(
+			&context->immune, context->nodes * sizeof(bool)
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
@@ -118,6 +124,10 @@ void prepareSimulationContext(SimulationContext *context, unsigned int src) {
 
 	CUDA_CHECK_RETURN(cudaMemset(
 			context->infected, -1, context->nodes * sizeof(int)
+	));
+
+	CUDA_CHECK_RETURN(cudaMemset(
+			context->immune, 0, context->nodes * sizeof(bool)
 	));
 
 	CUDA_CHECK_RETURN(cudaMemset(
@@ -189,6 +199,7 @@ void freeSimulationContext(SimulationContext *context) {
 		CUDA_CHECK_RETURN(cudaFree(context->R));
 		CUDA_CHECK_RETURN(cudaFree(context->C));
 		CUDA_CHECK_RETURN(cudaFree(context->infected));
+		CUDA_CHECK_RETURN(cudaFree(context->immune));
 		CUDA_CHECK_RETURN(cudaFree(context->didInfectNeighbors));
 		CUDA_CHECK_RETURN(cudaFree(context->inFrontierSize));
 		CUDA_CHECK_RETURN(cudaFree(context->inputFrontier));
