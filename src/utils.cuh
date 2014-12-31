@@ -198,7 +198,8 @@ int cudaGetMaxGflopsDeviceID() {
  * size: the size of the source array in bytes
  * returns: the CUDA error state after the performed operations
  */
-cudaError_t cudaGetDeviceCopy(void *src, void** dst, size_t size) {
+template<class T>
+cudaError_t cudaGetDeviceCopy(T *src, T** dst, size_t size) {
 	cudaError_t status = cudaMalloc(dst, size);
 
 	if(status != cudaSuccess) {
@@ -215,8 +216,9 @@ cudaError_t cudaGetDeviceCopy(void *src, void** dst, size_t size) {
  * size: the size of the source array in bytes
  * returns: the CUDA error state after the performed operations
  */
-cudaError_t cudaGetHostCopy(void *src, void** dst, size_t size) {
-	*dst = malloc(size);
+template<class T>
+cudaError_t cudaGetHostCopy(T *src, T** dst, size_t size) {
+	*dst = (T *) malloc(size);
 	exitIf(*dst == NULL, "Error allocating host copy array.");
 	return cudaMemcpy(*dst, src, size, cudaMemcpyDeviceToHost);
 }
@@ -232,8 +234,8 @@ void printFloatArray(float *array, int size, bool onHost) {
 
 	if(!onHost) {
 		CUDA_CHECK_RETURN(cudaGetHostCopy(
-				(void *) array,
-				(void **) &printArray,
+				array,
+				&printArray,
 				size * sizeof(float)
 		));
 	}
@@ -255,8 +257,8 @@ void printIntArray(int *array, int size, bool onHost) {
 
 	if(!onHost) {
 		CUDA_CHECK_RETURN(cudaGetHostCopy(
-				(void *) array,
-				(void **) &printArray,
+				array,
+				&printArray,
 				size * sizeof(int)
 		));
 	}
@@ -278,8 +280,8 @@ void printBoolArray(bool *array, int size, bool onHost) {
 
 	if(!onHost) {
 		CUDA_CHECK_RETURN(cudaGetHostCopy(
-				(void *) array,
-				(void **) &printArray,
+				array,
+				&printArray,
 				size * sizeof(bool)
 		));
 	}

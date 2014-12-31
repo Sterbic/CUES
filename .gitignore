@@ -9,6 +9,7 @@ Debug/
 
 # PyCharm files
 scripts/.idea/
+*.pyc
 
 # Object files
 *.o

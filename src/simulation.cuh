@@ -59,14 +59,14 @@ SimulationContext *createSimulationContext(Graph *graph) {
 	context->CSize = graph->CSize;
 
 	CUDA_CHECK_RETURN(cudaGetDeviceCopy(
-			(void *) graph->R,
-			(void **) &context->R,
+			graph->R,
+			&context->R,
 			(graph->RSize) * sizeof(unsigned int)
 	));
 
 	CUDA_CHECK_RETURN(cudaGetDeviceCopy(
-			(void *) graph->C,
-			(void **) &context->C,
+			graph->C,
+			&context->C,
 			(graph->CSize) * sizeof(unsigned int)
 	));
 
