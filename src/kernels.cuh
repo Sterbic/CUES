@@ -101,8 +101,8 @@ __global__ void contractExpand(int iteration, float p, float q,
 		offset += gridDim.x * blockDim.x;
 
 		// test if the node is a duplicate
-		// if the node is immune no action should be performed
-		bool duplicate = immune[node];
+		// the dummy node is considered a duplicate
+		bool duplicate = node == nodes - 1;
 
 		// do warp culling
 		if(!duplicate) {
@@ -124,14 +124,14 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// test history if node is not a duplicate
 		unsigned int historyHash = node & (HISTORY_SIZE - 1);
-
-		if(!duplicate && history[historyHash] == node) {
-			duplicate = true;
-		}
+		duplicate = duplicate || (history[historyHash] == node);
 
 		if(DEBUG && (tid < 5)) {
 			printf("3 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
 		}
+
+		// node should be considered as a duplicate if it is immune
+		duplicate = duplicate || immune[node];
 
 		bool shouldVisit = false;
 		bool shouldExpand = false;
@@ -150,7 +150,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// try to recover the current node
 		bool didRecover = true;
-		if(!duplicate && (node != nodes - 1)) {
+		if(!duplicate) {
 			didRecover = qRand[node] < q;
 		}
 
