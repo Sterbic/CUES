@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 			unsigned int blocks = (inputSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
 			blocks = min(blocks, MAX_GRID_SIZE);
 
-			printf("Input size, blocks: %d %d\n", inputSize, blocks);
+			//printf("Input size, blocks: %d %d\n", inputSize, blocks);
 
 			generateRandForFrontier<<<blocks, BLOCK_SIZE>>>(
 					context->randStates,
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 			iteration++;
 
 			inputSize = getInputFrontierSize(context);
-			printf("Frontier size: %u -> ", inputSize);
+			printf("%d. iteration, frontier size: %u -> ", iteration, inputSize);
 			printIntArray((int *) context->inputFrontier, inputSize, false);
 		} while(inputSize > 0); // inputSize != 0
 

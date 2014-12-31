@@ -57,6 +57,30 @@ class Graph(object):
         self.compressed_id += 1
         return compressed_id
 
+    def needs_compression(self):
+        for node_id in range(len(self.nodes)):
+            Graph._print_progress(node_id + 1, "node IDs checked")
+
+            if node_id not in self.nodes:
+                return True
+
+        queue = deque([self.nodes[0]])
+        visited_ids = set()
+
+        while len(queue) > 0:
+            node = queue.popleft()
+
+            if node.node_id in visited_ids:
+                continue
+
+            visited_ids.add(node.node_id)
+            Graph._print_progress(len(visited_ids), "nodes analyzed")
+
+            for neighbor_id in node.neighbors:
+                queue.append(self.nodes[neighbor_id])
+
+        return len(visited_ids) != len(self.nodes)
+
     def compress(self, source):
         if source not in self.nodes:
             raise ValueError("The source ID is not in the graph.")
@@ -123,6 +147,9 @@ class Graph(object):
                 first = int(parts[0])
                 second = int(parts[1])
 
+                if first < 0 or second < 0:
+                    raise ValueError("Node IDs should be positive integers.")
+
                 graph._add_edge(first, second)
 
             return graph
@@ -132,13 +159,17 @@ def main(input_path, source, output_pah):
     print("Reading graph...")
     graph = Graph.load_from_file(input_path)
 
-    print("\nCompressing graph...")
-    graph.compress(int(source))
+    print("\nChecking if compression is needed...")
+    if graph.needs_compression():
+        print("\nCompressing graph...")
+        graph.compress(int(source))
 
-    print("\nSaving graph to file...")
-    graph.dump_to_file(output_pah)
+        print("\nSaving graph to file...")
+        graph.dump_to_file(output_pah)
 
-    print("\nGraph successfully compressed!")
+        print("\nGraph successfully compressed!")
+    else:
+        print("\nGraph is already compatible with CUES!")
 
 
 if __name__ == '__main__':
