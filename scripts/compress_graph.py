@@ -64,6 +64,8 @@ class Graph(object):
             if node_id not in self.nodes:
                 return True
 
+        Graph._print_progress(len(self.nodes), "node IDs checked\n", True)
+
         queue = deque([self.nodes[0]])
         visited_ids = set()
 
@@ -78,6 +80,8 @@ class Graph(object):
 
             for neighbor_id in node.neighbors:
                 queue.append(self.nodes[neighbor_id])
+
+        Graph._print_progress(len(visited_ids), "nodes analyzed", True)
 
         return len(visited_ids) != len(self.nodes)
 
@@ -101,6 +105,8 @@ class Graph(object):
             for neighbor_id in node.neighbors:
                 queue.append(self.nodes[neighbor_id])
 
+        Graph._print_progress(self.compressed_id, "nodes compressed", True)
+
     def dump_to_file(self, path):
         with open(path, "w") as file:
             source_id = self.compressed_nodes[0].node_id
@@ -120,9 +126,12 @@ class Graph(object):
                         file.write("%d %d\n" % (compressed_id,
                                                 neighbor.compressed_id))
 
+            Graph._print_progress(self.compressed_id + 1, "nodes saved", True)
+
     @staticmethod
-    def _print_progress(state, description):
-        print("\r%d %s" % (state, description), end="")
+    def _print_progress(state, description, force=False):
+        if force or state % 100 == 0:
+            print("\r%d %s" % (state, description), end="")
 
     @staticmethod
     def load_from_file(path):
@@ -151,6 +160,8 @@ class Graph(object):
                     raise ValueError("Node IDs should be positive integers.")
 
                 graph._add_edge(first, second)
+
+            Graph._print_progress(counter, "lines processed", True)
 
             return graph
 
