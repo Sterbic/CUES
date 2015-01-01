@@ -74,9 +74,6 @@ int main(int argc, char **argv) {
 	Graph *graph = loadGraph(graphPath);
 	printf("DONE\n");
 
-	printIntArray((int *)graph->R, graph->RSize, true);
-	printIntArray((int *) graph->C, graph->CSize, true);
-
 	exitIf(patientZero < 0 || patientZero > graph->N - 1,
 			"Source node is not present in the input graph.");
 
