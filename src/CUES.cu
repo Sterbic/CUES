@@ -13,51 +13,15 @@
 #include "simulation.cuh"
 #include "kernels.cuh"
 
-__device__ unsigned int bitreverse(unsigned int number) {
-	number = ((0xf0f0f0f0 & number) >> 4) | ((0x0f0f0f0f & number) << 4);
-	number = ((0xcccccccc & number) >> 2) | ((0x33333333 & number) << 2);
-	number = ((0xaaaaaaaa & number) >> 1) | ((0x55555555 & number) << 1);
-	return number;
-}
-
 /**
- * CUDA kernel function that reverses the order of bits in each element of the array.
+ * Usage: ./cues <graph_path> <source_node> <p> <q> <simulations>
+ * graph_path: the path to the graph in edge list format of the network that
+ * will be used in the simulation
+ * source_node: the node ID of the start of the epidemics, patient zero
+ * p: the probability that a node will infect its neighbors
+ * q: the probability that a node will recover and become immune
+ * simulations: the number of simulations to run
  */
-__global__ void bitreverse(void *data) {
-	unsigned int *idata = (unsigned int*) data;
-	idata[threadIdx.x] = bitreverse(idata[threadIdx.x]);
-}
-
-/**
- * Host function that prepares data array and passes it to the CUDA kernel.
- */
-/*int main(void) {
-	void *d = NULL;
-	int i;
-	unsigned int idata[WORK_SIZE], odata[WORK_SIZE];
-
-	for (i = 0; i < WORK_SIZE; i++)
-		idata[i] = (unsigned int) i;
-
-	CUDA_CHECK_RETURN(cudaMalloc((void**) &d, sizeof(int) * WORK_SIZE));
-	CUDA_CHECK_RETURN(
-			cudaMemcpy(d, idata, sizeof(int) * WORK_SIZE, cudaMemcpyHostToDevice));
-
-	bitreverse<<<1, WORK_SIZE, WORK_SIZE * sizeof(int)>>>(d);
-
-	CUDA_CHECK_RETURN(cudaThreadSynchronize());	// Wait for the GPU launched work to complete
-	CUDA_CHECK_RETURN(cudaGetLastError());
-	CUDA_CHECK_RETURN(cudaMemcpy(odata, d, sizeof(int) * WORK_SIZE, cudaMemcpyDeviceToHost));
-
-	for (i = 0; i < WORK_SIZE; i++)
-		printf("Input value: %u, device output: %u\n", idata[i], odata[i]);
-
-	CUDA_CHECK_RETURN(cudaFree((void*) d));
-	CUDA_CHECK_RETURN(cudaDeviceReset());
-
-	return 0;
-}*/
-
 int main(int argc, char **argv) {
 	if(argc != 6) {
 		printUsage();
@@ -127,21 +91,27 @@ int main(int argc, char **argv) {
 	initRandoms<<<MAX_GRID_SIZE, BLOCK_SIZE>>>(context->randStates, SEED);
 	printf("DONE\n\n");
 
+	clock_t globalClock = clock();
+
 	for(int simulation = 1; simulation <= simulations; simulation++) {
 		CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 
-		printf("Running %d. simulation... ", simulation);
+		clock_t simulationClock = clock();
+
+		printf("Running %d. simulation...\n", simulation);
 		prepareSimulationContext(context, patientZero);
 
 		int iteration = 0;
 		unsigned int inputSize = 1;
 
+		// loop while the input frontier is not empty
 		do {
+			clock_t iterationClock = clock();
+
 			unsigned int blocks = (inputSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
 			blocks = min(blocks, MAX_GRID_SIZE);
 
-			//printf("Input size, blocks: %d %d\n", inputSize, blocks);
-
+			// refresh random test values for each node in the input frontier
 			generateRandForFrontier<<<blocks, BLOCK_SIZE>>>(
 					context->randStates,
 					context->inputFrontier,
@@ -150,6 +120,7 @@ int main(int argc, char **argv) {
 					context->qRand
 			);
 
+			// run the contract-expand kernel
 			contractExpand<<<blocks, BLOCK_SIZE>>>(
 					iteration,
 					p,
@@ -172,18 +143,23 @@ int main(int argc, char **argv) {
 			iteration++;
 
 			inputSize = getInputFrontierSize(context);
-			printf("%d. iteration, frontier size: %u -> ", iteration, inputSize);
-			printIntArray((int *) context->inputFrontier, inputSize, false);
-		} while(inputSize > 0); // inputSize != 0
 
-		printIntArray(context->infected, context->nodes - 1, false);
-		printBoolArray(context->immune, context->nodes - 1, false);
-		printBoolArray(context->didInfectNeighbors, context->nodes - 1, false);
-		printf(" DONE\n");
+			printf("\t%3d. iteration output - frontier size: %u, ", iteration,
+					inputSize);
+			printf("time elapsed %.3f ms\n", getElapsedTimeMS(iterationClock));
+		} while(inputSize > 0);
+
+		printf("Simulation ended - elapsed time %.3f ms\n\n",
+				getElapsedTimeMS(simulationClock));
 	}
+
+	printf("All simulations ended - elapsed time %.3f ms\n",
+			getElapsedTimeMS(globalClock));
 
 	freeSimulationContext(context);
 	freeGraph(graph);
 
 	CUDA_CHECK_RETURN(cudaDeviceReset());
+
+	return 0;
 }
