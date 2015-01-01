@@ -9,6 +9,7 @@
 
 #include <cstdio>
 #include <algorithm>
+#include <time.h>
 #include <cuda_runtime.h>
 #include <curand.h>
 
@@ -290,6 +291,15 @@ void printBoolArray(bool *array, int size, bool onHost) {
 		printf("%d", printArray[i]);
 		printf(i == size - 1 ? "\n" : ", ");
 	}
+}
+
+/**
+ * Return the time elapsed from the given event in ms.
+ * startClock: the clock for the start event
+ * returns: elapsed time in ms
+ */
+float getElapsedTimeMS(clock_t startClock) {
+	return ((float) clock() - startClock) / CLOCKS_PER_SEC * 1000;
 }
 
 #endif
