@@ -1,3 +1,6 @@
+# Large inputs
+data/live_journal_10M_lines_compressed.txt
+
 # Makefile binaries
 cues
 
