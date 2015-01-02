@@ -10,7 +10,7 @@
 #define WARP_SIZE 32
 #define BLOCK_SIZE 512
 #define WARPS_PER_BLOCK (BLOCK_SIZE / WARP_SIZE)
-#define MAX_GRID_SIZE 128
+#define MAX_GRID_SIZE 256
 
 #define SEED 17
 

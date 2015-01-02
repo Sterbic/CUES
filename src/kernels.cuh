@@ -34,11 +34,15 @@ __global__ void generateRandForFrontier(curandState *states,
 		unsigned int *frontier, unsigned int *frontierSize, float *pRand,
 		float *qRand) {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	unsigned int size = *frontierSize;
+	unsigned int offset = 0;
+
+	// read the prng state for the current thread from global memory
 	curandState localState = states[tid];
 
-	while(tid < *frontierSize) {
-		unsigned int node = frontier[tid];
-		tid += blockDim.x * gridDim.x;
+	while(tid + offset < size) {
+		unsigned int node = frontier[tid + offset];
+		offset += blockDim.x * gridDim.x;
 
 		float p = curand_uniform(&localState);
 		float q = curand_uniform(&localState);
@@ -47,6 +51,7 @@ __global__ void generateRandForFrontier(curandState *states,
 		qRand[node] = q;
 	}
 
+	// write the updates prng state for the local thread back to global memory
 	states[tid] = localState;
 }
 
@@ -57,10 +62,10 @@ __global__ void contractExpand(int iteration, float p, float q,
 		int *infected, bool *immune, bool *didInfectNeighbors, float *pRand,
 		float *qRand) {
 	// structure for warp culling
-	__shared__ unsigned int warpScratch[WARPS_PER_BLOCK][128];
+	__shared__ volatile unsigned int warpScratch[WARPS_PER_BLOCK][128];
 
 	// structure for history culling
-	__shared__ int history[HISTORY_SIZE];
+	__shared__ volatile int history[HISTORY_SIZE];
 
 	// strucutre for the prescan calculations
 	__shared__ unsigned int threadScratch[BLOCK_SIZE][3];
@@ -109,10 +114,21 @@ __global__ void contractExpand(int iteration, float p, float q,
 			unsigned int hash = node & 127;
 			warpScratch[warpId][hash] = node;
 
-			if(warpScratch[warpId][hash] == node) {
-				warpScratch[warpId][hash] = localTid;
+			unsigned int retrivedNode = warpScratch[warpId][hash];
 
-				if(warpScratch[warpId][hash] != localTid) {
+			if(DEBUG && (tid < 5)) {
+				printf("1.5 # Thread: %u, node: %u, retrived: %u\n", localTid, node, retrivedNode);
+			}
+
+			if(retrivedNode == node) {
+				warpScratch[warpId][hash] = localTid;
+				unsigned int retrivedTid = warpScratch[warpId][hash];
+
+				if(DEBUG && (tid < 5)) {
+					printf("1.6 # Thread: %u, Retrived: %u\n", localTid, retrivedTid);
+				}
+
+				if(retrivedTid != localTid) {
 					duplicate = true;
 				}
 			}
@@ -123,8 +139,14 @@ __global__ void contractExpand(int iteration, float p, float q,
 		}
 
 		// test history if node is not a duplicate
-		unsigned int historyHash = node & (HISTORY_SIZE - 1);
-		duplicate = duplicate || (history[historyHash] == node);
+		unsigned int historyHash = node % HISTORY_SIZE;
+		unsigned int retrivedNode = history[historyHash];
+
+		if(node == retrivedNode) {
+			duplicate = true;
+		} else {
+			history[historyHash] = node;
+		}
 
 		if(DEBUG && (tid < 5)) {
 			printf("3 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
@@ -144,7 +166,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// visit node if it should be visited
 		if(shouldVisit) {
-			history[historyHash] = node;
 			infected[node] = iteration;
 		}
 

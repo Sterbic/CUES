@@ -44,8 +44,8 @@ int main(int argc, char **argv) {
 
 	printf("\t%-25s %s\n", "Graph file:", graphPath);
 	printf("\t%-25s %d\n", "Source node:", patientZero);
-	printf("\t%-25s %.2f\n", "Q:", q);
 	printf("\t%-25s %.2f\n", "P:", p);
+	printf("\t%-25s %.2f\n", "Q:", q);
 	printf("\t%-25s %d\n", "Simulations:", simulations);
 
 	printf("\nSearching for best device... ");
@@ -117,6 +117,8 @@ int main(int argc, char **argv) {
 					context->qRand
 			);
 
+			CUDA_CHECK_RETURN(cudaDeviceSynchronize());
+
 			// run the contract-expand kernel
 			contractExpand<<<blocks, BLOCK_SIZE>>>(
 					iteration,
@@ -135,6 +137,7 @@ int main(int argc, char **argv) {
 					context->pRand,
 					context->qRand
 			);
+			CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 
 			iterationDone(context);
 			iteration++;
