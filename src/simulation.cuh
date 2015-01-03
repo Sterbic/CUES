@@ -18,8 +18,7 @@
  * R[N+1]: contains the indices in C for the start of the adjacency lists
  * C[CSize]: concatenated adjacency lists
  * infected[N]: the iteration at which each node was infected
- * immune[N]: bool array, true if the node is immune
- * didInfectNeighbors[stateSize]: bool array, true if node infected neighbours
+ * nodeState[N]: byte array with status flags for each node
  * inFrontierSize: the current size of the input frontier
  * inputFrontier[CSize]: the input edge frontier
  * outFrontierSize: the current size of the output frontier
@@ -34,8 +33,7 @@ typedef struct {
 	unsigned int *R;
 	unsigned int *C;
 	int *infected;
-	bool *immune;
-	bool *didInfectNeighbors;
+	unsigned char *nodeState;
 	unsigned int *inFrontierSize;
 	unsigned int *inputFrontier;
 	unsigned int *outFrontierSize;
@@ -75,11 +73,7 @@ SimulationContext *createSimulationContext(Graph *graph) {
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
-			&context->immune, context->nodes * sizeof(bool)
-	));
-
-	CUDA_CHECK_RETURN(cudaMalloc(
-			&context->didInfectNeighbors, context->nodes * sizeof(bool)
+			&context->nodeState, context->nodes * sizeof(unsigned char)
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
@@ -127,11 +121,7 @@ void prepareSimulationContext(SimulationContext *context, unsigned int src) {
 	));
 
 	CUDA_CHECK_RETURN(cudaMemset(
-			context->immune, 0, context->nodes * sizeof(bool)
-	));
-
-	CUDA_CHECK_RETURN(cudaMemset(
-			context->didInfectNeighbors, 0, context->nodes * sizeof(bool)
+			context->nodeState, 0, context->nodes * sizeof(unsigned char)
 	));
 
 	CUDA_CHECK_RETURN(cudaMemcpy(
@@ -199,8 +189,7 @@ void freeSimulationContext(SimulationContext *context) {
 		CUDA_CHECK_RETURN(cudaFree(context->R));
 		CUDA_CHECK_RETURN(cudaFree(context->C));
 		CUDA_CHECK_RETURN(cudaFree(context->infected));
-		CUDA_CHECK_RETURN(cudaFree(context->immune));
-		CUDA_CHECK_RETURN(cudaFree(context->didInfectNeighbors));
+		CUDA_CHECK_RETURN(cudaFree(context->nodeState));
 		CUDA_CHECK_RETURN(cudaFree(context->inFrontierSize));
 		CUDA_CHECK_RETURN(cudaFree(context->inputFrontier));
 		CUDA_CHECK_RETURN(cudaFree(context->outFrontierSize));

@@ -59,8 +59,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int nodes,	unsigned int *R, unsigned int *C,
 		unsigned int *inFrontierSize, unsigned int *inputFrontier,
 		unsigned int *outFrontierSize, unsigned int *outputFrontier,
-		int *infected, bool *immune, bool *didInfectNeighbors, float *pRand,
-		float *qRand) {
+		int *infected, unsigned char *nodeState, float *pRand, float *qRand) {
 	// structure for warp culling
 	__shared__ volatile unsigned int warpScratch[WARPS_PER_BLOCK][128];
 
@@ -93,10 +92,12 @@ __global__ void contractExpand(int iteration, float p, float q,
 		// get the node and all the flags for the current thread
 		// initially assign to dummy node
 		unsigned int node = nodes - 1;
+		bool duplicate = true;
 
 		// test if the thread is assigned to a valid node
 		if(tid + offset < frontierSize) {
 			node = inputFrontier[tid + offset];
+			duplicate = false;
 		}
 
 		if(DEBUG && (tid < 5)) {
@@ -104,10 +105,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 		}
 
 		offset += gridDim.x * blockDim.x;
-
-		// test if the node is a duplicate
-		// the dummy node is considered a duplicate
-		bool duplicate = node == nodes - 1;
 
 		// do warp culling
 		if(!duplicate) {
@@ -149,28 +146,37 @@ __global__ void contractExpand(int iteration, float p, float q,
 		}
 
 		if(DEBUG && (tid < 5)) {
-			printf("3 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
+			printf("3 # Thread: %u, Node: %u, dup: %d\n", localTid, node, duplicate);
 		}
 
-		// node should be considered as a duplicate if it is immune
-		duplicate = duplicate || immune[node];
+		// state flags are set to true by default
+		unsigned char state = IMMUNE_AND_INFECTED_NEIGHBORS_MASK;
+		bool immune = true;
+		bool infectedNeighbors = true;
 
-		bool shouldVisit = false;
-		bool shouldExpand = false;
-
-		// if the node is not a duplicate init action flags
+		// fetch node state if it is not a duplicate
 		if(!duplicate) {
-			shouldVisit = infected[node] == -1;
-			shouldExpand = !didInfectNeighbors[node];
+			state = nodeState[node];
+
+			immune = state & IMMUNE_MASK;
+			infectedNeighbors = state & DID_INFECT_NEIGHBORS_MASK;
+
+			// node should be considered as a duplicate if it is immune
+			duplicate = duplicate || immune;
+		}
+
+		if(DEBUG && (tid < 5)) {
+			printf("3.1 # Thread: %u, Node: %u, dup: %d, immune: %d, infct: %d\n", threadIdx.x, node, duplicate, immune, infectedNeighbors);
 		}
 
 		// visit node if it should be visited
-		if(shouldVisit) {
+		if(!duplicate && infected[node] == -1) {
 			infected[node] = iteration;
 		}
 
 		// try to recover the current node
 		bool didRecover = true;
+
 		if(!duplicate) {
 			didRecover = qRand[node] < q;
 		}
@@ -180,19 +186,19 @@ __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int rEnd = 0;
 
 		// do test for expansion
-		if(shouldExpand) {
+		if(!duplicate && !infectedNeighbors) {
 			float pTest = pRand[node];
 
 			// if test is successful load offsets in C and set flag
 			if(pTest < p) {
 				rStart = R[node];
 				rEnd = R[node + 1];
-				didInfectNeighbors[node] = true;
+				infectedNeighbors = true;
 			}
 		}
 
 		if(DEBUG && (tid < 5)) {
-			printf("4 # Thread: %u, Node: %u, dup: %d, visit: %d, exp: %d\n", threadIdx.x, node, duplicate, shouldVisit, shouldExpand);
+			printf("4 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
 		}
 
 		// calculate size for coarse and fine grained node gathering
@@ -430,12 +436,23 @@ __global__ void contractExpand(int iteration, float p, float q,
 		// perform recovery gahtering if needed
 		if(!duplicate) {
 			if(didRecover) {
-				immune[node] = true;
+				immune = true;
 			} else {
 				unsigned int outOffset = baseOffset + coarseTotal + fineTotal +
 						threadScratch[localTid][2];
 				outputFrontier[outOffset] = node;
 			}
+		}
+
+		// update node state in global memory if needed, harcoded bit movements
+		unsigned char newState = immune | infectedNeighbors << 1;
+
+		if(DEBUG && (tid < 5)) {
+			printf("3.1 # Thread: %u, Node: %u, old: %d, new: %d\n", threadIdx.x, node, state, newState);
+		}
+
+		if(newState != state) {
+			nodeState[node] = newState;
 		}
 	}
 }

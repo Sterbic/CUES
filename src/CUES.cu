@@ -132,8 +132,7 @@ int main(int argc, char **argv) {
 					context->outFrontierSize,
 					context->outputFrontier,
 					context->infected,
-					context->immune,
-					context->didInfectNeighbors,
+					context->nodeState,
 					context->pRand,
 					context->qRand
 			);
