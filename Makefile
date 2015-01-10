@@ -3,4 +3,4 @@ LINKER_FLAGS = -lcurand
 SRC = src/cues.cu
 
 cues:
-	nvcc -o $@ $(SRC) $(FLAGS) $(LINKER_FLAGS)
+	nvcc -g -G -o $@ $(SRC) $(FLAGS) $(LINKER_FLAGS)
