@@ -14,16 +14,17 @@
 #include "kernels.cuh"
 
 /**
- * Usage: ./cues <graph_path> <source_node> <p> <q> <simulations>
+ * Usage: ./cues <graph_path> <source_node> <p> <q> <simulations> <out_dir>
  * graph_path: the path to the graph in edge list format of the network that
  * will be used in the simulation
  * source_node: the node ID of the start of the epidemics, patient zero
  * p: the probability that a node will infect its neighbors
  * q: the probability that a node will recover and become immune
  * simulations: the number of simulations to run
+ * out_dir: the directory where the output will be saved
  */
 int main(int argc, char **argv) {
-	if(argc != 6) {
+	if(argc != 7) {
 		printUsage();
 		exit(1);
 	}
@@ -33,6 +34,7 @@ int main(int argc, char **argv) {
 	double p = atof(argv[3]);
 	double q = atof(argv[4]);
 	int simulations = atoi(argv[5]);
+	char *outDirectory = argv[6];
 
 	exitIf(p < 0.0 || p > 1.0,
 			"The p parameter should be from the interval [0-1].");
@@ -117,8 +119,6 @@ int main(int argc, char **argv) {
 					context->qRand
 			);
 
-			CUDA_CHECK_RETURN(cudaDeviceSynchronize());
-
 			// run the contract-expand kernel
 			contractExpand<<<blocks, BLOCK_SIZE>>>(
 					iteration,
@@ -136,7 +136,6 @@ int main(int argc, char **argv) {
 					context->pRand,
 					context->qRand
 			);
-			CUDA_CHECK_RETURN(cudaDeviceSynchronize());
 
 			iterationDone(context);
 			iteration++;
@@ -150,6 +149,7 @@ int main(int argc, char **argv) {
 
 		printf("Simulation ended - elapsed time %.3f ms\n\n",
 				getElapsedTimeMS(simulationClock));
+		dumpLevels(context, simulation, outDirectory);
 	}
 
 	printf("All simulations ended - elapsed time %.3f ms\n",

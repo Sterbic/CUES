@@ -20,9 +20,9 @@
  * infected[N]: the iteration at which each node was infected
  * nodeState[N]: byte array with status flags for each node
  * inFrontierSize: the current size of the input frontier
- * inputFrontier[CSize]: the input edge frontier
+ * inputFrontier[10*CSize]: the input edge frontier
  * outFrontierSize: the current size of the output frontier
- * outputFrontier[CSize]: the output edge frontier
+ * outputFrontier[10*CSize]: the output edge frontier
  * randState[MAX_THREADS]: the state of the prng for each thread
  * pRand[N]: probabilities to be avaluated agains p (infect neighbors)
  * qRand[N]: probabilities to be avaluated agains q (recover)
@@ -178,6 +178,33 @@ unsigned int getInputFrontierSize(SimulationContext *context) {
 	));
 
 	return frontierSize;
+}
+
+/**
+ * Saves the levels of all nodes to file.
+ * context: the context pointer returned by createSimulationContext
+ * simulation: the number of the current simulation
+ * directory: path to a directory where the output will be saved
+ */
+void dumpLevels(SimulationContext *context, int simulation, char *directory) {
+	int *levels = NULL;
+	CUDA_CHECK_RETURN(cudaGetHostCopy(
+			context->infected,
+			&levels,
+			(context->nodes - 1) * sizeof(int)
+	));
+
+	char path[100];
+	sprintf(path, "%s/levels_%d.txt", directory, simulation);
+
+	FILE *file = fopen(path, "w");
+	exitIf(file == NULL, "Error opening output levels file.");
+
+	for(int i = 0; i < context->nodes - 1; i++) {
+		fprintf(file, "%d\n", levels[i]);
+	}
+
+	fclose(file);
 }
 
 /**

@@ -59,7 +59,8 @@ void exitIf(int condition, const char *message) {
  * Prints the CUES usage to stdout.
  */
 void printUsage() {
-	printf("Usage: ./cues <graph_path> <source_node> <p> <q> <simulations>\n");
+	printf("Usage: ./cues <graph_path> <source_node> <p> <q> <simulations> ");
+	printf("<out_dir>\n");
 	printf("See README.md for details.\n");
 }
 

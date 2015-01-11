@@ -30,7 +30,7 @@ To install CUES run make in its root folder. This will build an executable named
 3) Usage
 ---------------------
 
-`./cues <graph_path> <source_node> <p> <q> <simulations>`
+`./cues <graph_path> <source_node> <p> <q> <simulations> <out_dir>`
 
 CUES expects 5 command line arguments: 
 - **graph_path:** the path to the graph in edge list format of the network that will be used
@@ -39,6 +39,9 @@ in the simulation
 - **p:** the probability that a node will infect its neighbors 
 - **q:** the probability that a node will recover and become immune 
 - **simulations:** the number of simulations to run
+- **out_dir:** the directory where the output will be saved
+
+For each simulation, CUES will output the iteration in which each node was infected.
 
 
 4) Documentation

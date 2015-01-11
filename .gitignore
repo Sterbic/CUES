@@ -1,8 +1,9 @@
 # Large inputs
 data_large/
 
-# Makefile binaries
+# Makefile binaries and output folder
 cues
+out/
 
 # NSight files
 .project

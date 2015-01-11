@@ -5,8 +5,6 @@
 #ifndef KERLENS_CUH_
 #define KERLENS_CUH_
 
-#define DEBUG false
-
 #include <curand_kernel.h>
 
 // HISTORY_SIZE must be a power of 2
@@ -100,10 +98,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 			duplicate = false;
 		}
 
-		if(DEBUG && (tid < 5)) {
-			printf("1 # Thread: %u, Node: %u\n", localTid, node);
-		}
-
 		offset += gridDim.x * blockDim.x;
 
 		// do warp culling
@@ -113,26 +107,14 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 			unsigned int retrivedNode = warpScratch[warpId][hash];
 
-			if(DEBUG && (tid < 5)) {
-				printf("1.5 # Thread: %u, node: %u, retrived: %u\n", localTid, node, retrivedNode);
-			}
-
 			if(retrivedNode == node) {
 				warpScratch[warpId][hash] = localTid;
 				unsigned int retrivedTid = warpScratch[warpId][hash];
-
-				if(DEBUG && (tid < 5)) {
-					printf("1.6 # Thread: %u, Retrived: %u\n", localTid, retrivedTid);
-				}
 
 				if(retrivedTid != localTid) {
 					duplicate = true;
 				}
 			}
-		}
-
-		if(DEBUG && (tid < 5)) {
-			printf("2 # Thread: %u, Node: %u, dup: %d\n", localTid, node, duplicate);
 		}
 
 		// test history if node is not a duplicate
@@ -143,10 +125,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 			duplicate = true;
 		} else {
 			history[historyHash] = node;
-		}
-
-		if(DEBUG && (tid < 5)) {
-			printf("3 # Thread: %u, Node: %u, dup: %d\n", localTid, node, duplicate);
 		}
 
 		// state flags are set to true by default
@@ -163,10 +141,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 			// node should be considered as a duplicate if it is immune
 			duplicate = duplicate || immune;
-		}
-
-		if(DEBUG && (tid < 5)) {
-			printf("3.1 # Thread: %u, Node: %u, dup: %d, immune: %d, infct: %d\n", threadIdx.x, node, duplicate, immune, infectedNeighbors);
 		}
 
 		// visit node if it should be visited
@@ -197,10 +171,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 			}
 		}
 
-		if(DEBUG && (tid < 5)) {
-			printf("4 # Thread: %u, Node: %u, dup: %d\n", threadIdx.x, node, duplicate);
-		}
-
 		// calculate size for coarse and fine grained node gathering
 		unsigned int rLength = rEnd - rStart;
 		unsigned int coarseSize = 0;
@@ -211,10 +181,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 			coarseSize = rLength;
 		} else {
 			fineSize = rLength;
-		}
-
-		if(DEBUG && (tid < 5 || !duplicate)) {
-			printf("5 # Thread: %u, Node: %u, coarse: %u, fine: %u, rec: %u\n", threadIdx.x, node, coarseSize, fineSize, recoverySize);
 		}
 
 		// do prescan to determin local enqueue offsets
@@ -281,10 +247,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 			unsigned int total = coarseTotal + fineTotal + recoveryTotal;
 			unsigned int baseOffset = atomicAdd(outFrontierSize, total);
-
-			if(DEBUG) {
-				printf("6 # base: %u, coarse: %u, fine: %u\n", baseOffset, coarseTotal, fineTotal);
-			}
 
 			warpScratch[0][0] = baseOffset;
 			warpScratch[0][1] = coarseTotal;
@@ -389,10 +351,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 		unsigned int fineOffset = threadScratch[localTid][1];
 		int remain = fineTotal;
 
-		if(DEBUG && (tid < 5)) {
-			printf("7 # Thread: %u, rStart: %u, rEnd: %u, remain: %u, offset: %d\n", threadIdx.x, rStart, rEnd, remain, fineOffset);
-		}
-
 		__syncthreads();
 
 		// loop while there are nodes to gather
@@ -400,9 +358,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 			// load positions in shared memory
 			while((fineOffset < blockProgress + BLOCK_SIZE) &&
 					(rStart < rEnd)) {
-				if(DEBUG) {
-					printf("8 # Thread: %u, rStart: %u, index: %u\n", threadIdx.x, rStart, fineOffset - blockProgress);
-				}
 
 				threadScratch[fineOffset - blockProgress][0] = rStart;
 				fineOffset++;
@@ -422,10 +377,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 						blockProgress + localTid;
 
 				outputFrontier[outOffset] = neighbor;
-
-				if(DEBUG) {
-					printf("9 # Thread: %u, Node: %u, index: %u\n", threadIdx.x, neighbor, outOffset);
-				}
 			}
 
 			blockProgress += BLOCK_SIZE;
@@ -447,10 +398,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 
 		// update node state in global memory if needed, harcoded bit movements
 		unsigned char newState = immune | infectedNeighbors << 1;
-
-		if(DEBUG && (tid < 5)) {
-			printf("3.1 # Thread: %u, Node: %u, old: %d, new: %d\n", threadIdx.x, node, state, newState);
-		}
 
 		if(newState != state) {
 			nodeState[node] = newState;
