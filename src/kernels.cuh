@@ -282,6 +282,10 @@ __global__ void contractExpand(int iteration, float p, float q,
 			unsigned int total = coarseTotal + fineTotal + recoveryTotal;
 			unsigned int baseOffset = atomicAdd(outFrontierSize, total);
 
+			if(baseOffset + total >= ((9960010 * 2) - 1)) {
+				printf("ERROR OFFSET: %d\n", baseOffset + total);
+			}
+
 			if(DEBUG) {
 				printf("6 # base: %u, coarse: %u, fine: %u\n", baseOffset, coarseTotal, fineTotal);
 			}
@@ -341,9 +345,6 @@ __global__ void contractExpand(int iteration, float p, float q,
 			while(cIndex < cLast) {
 				unsigned int neighbor = C[cIndex];
 
-				if(outOffset > (9960010 * 2-1)) {
-					printf("ERROR OFFSET: %d\n", outOffset);
-				}
 				// store gathered neighbor in output frontier
 				outputFrontier[outOffset] = neighbor;
 
@@ -379,13 +380,8 @@ __global__ void contractExpand(int iteration, float p, float q,
 			while(cIndex < cLast) {
 				unsigned int neighbor = C[cIndex];
 
-				if(outOffset > (9960010 * 2-1)) {
-					printf("ERROR OFFSET: %d\n", outOffset);
-				}
-
 				// store gathered neighbor in output frontier
 				outputFrontier[outOffset] = neighbor;
-
 
 				outOffset += WARP_SIZE;
 				cIndex += WARP_SIZE;
@@ -428,9 +424,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 				// store gathered neighbor in output frontier
 				unsigned int outOffset = baseOffset + coarseTotal +
 						blockProgress + localTid;
-				if(outOffset > (9960010 * 2-1)) {
-					printf("ERROR OFFSET: %d\n", outOffset);
-				}
+
 				outputFrontier[outOffset] = neighbor;
 
 				if(DEBUG) {
