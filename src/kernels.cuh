@@ -422,6 +422,10 @@ __global__ void contractExpand(int iteration, float p, float q,
 				unsigned int cIndex = threadScratch[localTid][0];
 				unsigned int neighbor = C[cIndex];
 
+				if(outOffset > (9960010 * 2-1)) {
+					printf("ERROR OFFSET: %d", outOffset);
+				}
+
 				// store gathered neighbor in output frontier
 				unsigned int outOffset = baseOffset + coarseTotal +
 						blockProgress + localTid;
