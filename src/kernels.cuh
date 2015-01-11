@@ -282,9 +282,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 			unsigned int total = coarseTotal + fineTotal + recoveryTotal;
 			unsigned int baseOffset = atomicAdd(outFrontierSize, total);
 
-			if(baseOffset + total >= ((9960010 * 2) - 1)) {
-				printf("ERROR OFFSET: %d\n", baseOffset + total);
-			}
+			printf("SIZE OFFSET: %u\n", baseOffset + total);
 
 			if(DEBUG) {
 				printf("6 # base: %u, coarse: %u, fine: %u\n", baseOffset, coarseTotal, fineTotal);
