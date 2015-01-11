@@ -376,8 +376,13 @@ __global__ void contractExpand(int iteration, float p, float q,
 			while(cIndex < cLast) {
 				unsigned int neighbor = C[cIndex];
 
+				if(outOffset > (9960010 * 2-1)) {
+					printf("ERROR OFFSET: %d", outOffset);
+				}
+
 				// store gathered neighbor in output frontier
 				outputFrontier[outOffset] = neighbor;
+
 
 				outOffset += WARP_SIZE;
 				cIndex += WARP_SIZE;
