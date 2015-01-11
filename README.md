@@ -43,7 +43,7 @@ in the simulation
 
 For each simulation, CUES will output the iteration in which each node was infected.
 
-To test the program after installation run the following command: `./test.sh`
+To test the program after installation run the following command from the root folder: `./test.sh`
 
 
 4) Documentation
