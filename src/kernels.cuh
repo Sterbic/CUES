@@ -342,7 +342,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 				unsigned int neighbor = C[cIndex];
 
 				if(outOffset > (9960010 * 2-1)) {
-					printf("ERROR OFFSET: %d", outOffset);
+					printf("ERROR OFFSET: %d\n", outOffset);
 				}
 				// store gathered neighbor in output frontier
 				outputFrontier[outOffset] = neighbor;
@@ -380,7 +380,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 				unsigned int neighbor = C[cIndex];
 
 				if(outOffset > (9960010 * 2-1)) {
-					printf("ERROR OFFSET: %d", outOffset);
+					printf("ERROR OFFSET: %d\n", outOffset);
 				}
 
 				// store gathered neighbor in output frontier
@@ -429,7 +429,7 @@ __global__ void contractExpand(int iteration, float p, float q,
 				unsigned int outOffset = baseOffset + coarseTotal +
 						blockProgress + localTid;
 				if(outOffset > (9960010 * 2-1)) {
-					printf("ERROR OFFSET: %d", outOffset);
+					printf("ERROR OFFSET: %d\n", outOffset);
 				}
 				outputFrontier[outOffset] = neighbor;
 
