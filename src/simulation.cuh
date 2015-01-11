@@ -81,7 +81,7 @@ SimulationContext *createSimulationContext(Graph *graph) {
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
-			&context->inputFrontier, context->CSize * sizeof(unsigned int)
+			&context->inputFrontier, 10 * context->CSize * sizeof(unsigned int)
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
@@ -89,7 +89,7 @@ SimulationContext *createSimulationContext(Graph *graph) {
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
-			&context->outputFrontier, context->CSize * sizeof(unsigned int)
+			&context->outputFrontier, 10 * context->CSize * sizeof(unsigned int)
 	));
 
 	CUDA_CHECK_RETURN(cudaMalloc(
